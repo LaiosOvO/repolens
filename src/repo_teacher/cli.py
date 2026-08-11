@@ -35,7 +35,7 @@ from .persistence import (
 from .report import render_report
 
 
-REPORT_SYNTHESIS_CONTRACT_VERSION = "global-graph-business-capability-v9"
+REPORT_SYNTHESIS_CONTRACT_VERSION = "human-interaction-and-implementation-v10"
 
 
 def _bind_generation(payload: dict[str, object], generation_id: str) -> dict[str, object]:
@@ -1009,9 +1009,17 @@ scope.allowed_source_paths，禁止 rg、grep、find、tree 和整仓重扫。�
   STT/LLM/TTS、MCP、知识库、评测、配额、鉴权等应归属主轴或降为支撑能力。
 - 每个 capability id 最多归属一条 core_product_axis。不直接产生核心用户结果的 id 放入
   supporting_capability_ids；两者必须刚好覆盖 capability_order 的全部 id。
+- 每条 core_product_axis.end_to_end_flow 会直接画成面向人的交互图，用它解释数据、控制权与状态怎样移动。每一步必须写成
+  “参与者/模块：读取什么或收到什么 → 做什么判断/处理 → 写出什么给谁”，不能只列类名、组件名或动词。
+  第一项必须说清输入从哪里来，最后一项必须说清输出交给用户或哪条相邻产品主轴；如果一条主轴依赖
+  另一条主轴（例如语音帧管线把转写交给 Flow，Flow 再把 LLM/TTS 输出送回帧管线），必须把两次交接写出来。
 - core_journey 必须是一条真实端到端主链，每步写 actor、动作、状态变化和下一跳。
 - 如果是平台提交任务再由 Worker 完成，必须具体说明提交、持久化或排队、调度/租约、Worker 执行、
   事件/结果回传分别由谁负责；没有源码证据的环节明确写未知，不能补成常见架构。
+- 如果是开发/数字员工平台，必须回答“创建应用”由本地 CLI、本地 Agent、浏览器控制面还是远端服务完成，
+  提交的是 prompt、模板、工作流定义、代码补丁还是构建任务；还要说明生成物放在哪里。“一键部署”必须
+  说明调用仓库内构建器、容器/Serverless 流水线、云平台 API 或只是生成配置，并讲清日志、失败、重试、
+  最终 URL 如何回传。源码不能证明本地/远端或部署引擎时明确写未知。
 - architecture_style 说明更接近 DDD、分层架构、模块化单体、客户端/服务器、事件驱动、插件式、
   控制面/数据面或其它组合，并说明源码事实，不可只贴标签。
 - engineering_structure 是“项目工程结构”，必须直接判断 repository 是 monorepo、单包或多服务，
@@ -1025,6 +1033,10 @@ scope.allowed_source_paths，禁止 rg、grep、find、tree 和整仓重扫。�
 - 如果项目核心包含语音或视频，one_liner 与 architecture_summary 必须优先说明媒体实现：采集端、
   会话/房间、信令与媒体传输协议、P2P/SFU/服务端中转、VAD/ASR/录制/回放是否存在、流式还是整段；
   同时说明面试/会议等业务会话如何驱动媒体链。没有证据的环节明确写未知。
+- 语音项目的 core_journey 与对应产品主轴必须逐段说明真实媒体主链：客户端怎样持续采集/送帧，在哪里缓冲，
+  VAD 怎样判定开始与结束，ASR 是流式还是整段，转写怎样进入 LLM/Flow/工具调用，TTS 是增量还是整段，
+  文本帧和音频帧怎样回传，客户端何时播放、如何打断。不能只写“VAD → ASR → LLM → TTS”；每个箭头
+  都要写数据形态和控制条件。项目若使用不同机制，按源码写实际链路，不得套用固定模板。
 - code_organization 覆盖重要产品源码目录；逐项说明职责、所属层和边界。不要枚举 assets、fixture、
   生成物或 vendor，也不要把文件树当架构。
 - frontend_backend_boundary、data_and_state、deployment_shape 都必须明确；未知就说明未知。
@@ -1069,12 +1081,26 @@ def _chapter_batch_prompt(
   并按实际交接顺序说明“哪个模块产生什么，交给哪个模块继续处理”；支撑模块要明确标成支撑，
   不能与用户功能并列。一个功能跨模块时必须把跨模块链讲完整，不能只挑入口所在目录。
 - 必须写清 storage/write/read、control loop、decision、termination、dynamic behavior。
+- summary 和 mechanism_model.plain_summary 的第一句必须先用普通人能懂的话回答“简单来说，这个功能就是
+  什么”，再解释实现；不能以文件、类、函数、路由或“负责/管理/处理/编排”开头。
+- runtime_story.steps 会直接渲染成交互图和正文，必须逐步写清“谁收到什么 → 做什么 → 改了什么状态 →
+  交给谁”。步骤之间必须闭合，上一项的输出要能在下一项找到消费者。
 - 如果涉及 Memory、Loop、Graph、Voice、Router、并发，必须把对应具体机制讲透：
   存储在哪里、何时写入、如何查询、是否 gate/filter/rank/merge；
   是否真的是循环、具体是 for/while/事件循环哪一种；
   图在何时构建、router 在什么时候读哪份 state、输出什么、谁消费；
   并发为什么安全、等待点在哪里、结果如何合并；
   Voice 是串行、半双工还是真全双工，谁先谁后，缓冲还是增量流。
+- 对语音/视频功能，必须把采集/编码、Transport、缓冲、VAD、ASR、Flow/LLM/Tool、TTS、回传/播放和
+  barge-in/结束条件串成源码能证明的完整链；并明确媒体帧怎样变成 Flow 的上下文或事件，Flow 的结果又
+  怎样重新进入媒体管线。缺失环节写 unsupported/unknowns，不能用常识补齐。
+- 对工作流/多 Agent 编排，必须明确它是静态 DAG、动态状态机、事件驱动协作、消息总线还是其它模型；
+  图或节点在何时构建，router 读取哪份 state、输出什么，工具调用/节点切换与实时语音帧在哪里交接。
+- 对 Worker 功能，必须回答实际提交的 job payload/任务类型。若框架只定义通用 job 协议而任务由用户的
+  handler/subclass 注册，必须明确写“没有内置固定任务目录”，再列出源码已提供的 worker 子类和真实例子；
+  不得把 request/update/response 消息类型冒充业务任务类型。
+- 对应用生成/部署功能，必须回答执行在本地还是远端、任务怎样排队/持久化、生成物位置、部署引擎、
+  状态/日志/最终地址回传；无证据的环节进入 unknowns。
 - docs/spec/README 只能导航，不能单独当作实现证据。
 - 没有证据的内容写进 unsupported 或 unknowns，不能补写成事实。
 
@@ -2886,6 +2912,29 @@ def _normalize_project_overview(
     axes = overview.get("core_product_axes")
     if not isinstance(axes, list) or not 1 <= len(axes) <= 4:
         raise ValueError("project overview requires one to four core product axes")
+    supporting = overview.get("supporting_capability_ids")
+    if not isinstance(supporting, list) or any(
+        not isinstance(item, str) or item not in expected_ids for item in supporting
+    ):
+        raise ValueError("project overview supporting capability ids are invalid")
+    supporting_set = set(supporting)
+    # Structured-output models sometimes repeat the complete supporting bucket as
+    # a final "product axis" even though the same IDs are correctly listed as
+    # supporting.  The duplicated axis carries no additional classification: drop
+    # only that exact, all-supporting bucket.  Mixed overlap remains an error.
+    axes = [
+        axis
+        for axis in axes
+        if not (
+            isinstance(axis, dict)
+            and isinstance(axis.get("capability_ids"), list)
+            and axis.get("capability_ids")
+            and set(axis["capability_ids"]).issubset(supporting_set)
+        )
+    ]
+    if not axes:
+        raise ValueError("project overview requires at least one core product axis")
+    overview["core_product_axes"] = axes
     assigned_ids: list[str] = []
     axis_ids: set[str] = set()
     for position, axis in enumerate(axes, start=1):
@@ -2902,11 +2951,6 @@ def _normalize_project_overview(
         axis_ids.add(axis_id)
         assigned_ids.extend(member_ids)
         normalize_refs(axis, f"core_product_axes[{position}]", minimum=1)
-    supporting = overview.get("supporting_capability_ids")
-    if not isinstance(supporting, list) or any(
-        not isinstance(item, str) or item not in expected_ids for item in supporting
-    ):
-        raise ValueError("project overview supporting capability ids are invalid")
     if len(set(assigned_ids)) != len(assigned_ids):
         raise ValueError("project overview assigns a capability to multiple product axes")
     if set(assigned_ids) & set(supporting):

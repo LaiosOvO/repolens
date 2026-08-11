@@ -1,72 +1,111 @@
-# Repo Teacher
+# Repo Teacher 使用说明
 
-Repo Teacher 当前阶段的目标很窄：先把“陌生代码仓库讲清楚”这件事做对，再决定后续 Skill、看板、ACP 或更大的协作系统怎么接。
+Repo Teacher 是一个本地代码仓库教学报告生成器。它先建立文件、符号与依赖图，再由模型把源码证据归纳成“项目定位 → 产品主轴 → 业务功能 → 端到端交互 → 底层机制 → 难点与取舍 → 工程结构 → 源码证据”，最终为每个仓库生成一个主要给人阅读的 `index.html`。
 
-现在已经完成的是：
+它不会把 `main`、路由、鉴权、健康检查、数据库迁移、example 或 UI primitive 直接当成一级产品功能。example 会保留在对应业务功能的“真实场景”和源码证据中。
 
-- 13 个参考/验收仓的逐仓阅读笔记；
-- 基于这些阅读结果收敛出的产品形态决策；
-- 一个 Waku Agent 的 Go 版人类报告纵向切片；
-- 一份更容易扫读的研究总览页。
+每个业务功能必须先说“简单来说，这个功能就是……”，然后用交互图和文字回答：
 
-先看这里：
+- 谁触发，谁接管，产生什么，交给谁；
+- 每一步读什么、写什么、由谁决定下一步；
+- 循环、事件循环、路由、并发、等待和合并怎样工作；
+- 如何结束、打断、失败和恢复；
+- 一个真实场景从头到尾怎样运行；
+- 哪些结论由源码证明，哪些仍然未知。
 
-- [RepoLens 产品需求与换机交接](/Volumes/T7/workspace/ontology/graph/dev/repo/REPOLENS-REQUIREMENTS.md)
-- [研究导航 HTML](/Volumes/T7/workspace/ontology/graph/biz/docs/html/repo-teacher-reading-guide.html)
-- [逐仓阅读索引](/Volumes/T7/workspace/ontology/graph/dev/repo/docs/project-readings/README.md)
-- [阅读顺序与技术决策](/Volumes/T7/workspace/ontology/graph/dev/repo/docs/project-readings/reading-order-and-decision.md)
-- [正式 ADR](/Volumes/T7/workspace/ontology/graph/dev/repo/docs/decisions/0001-go-project-cli-and-human-project-report.md)
-- [Waku 人类报告包](/Volumes/T7/workspace/ontology/graph/biz/docs/html/repo-projects/waku-agent/index.html)
+语音项目还必须讲清采集/送帧、缓冲、VAD、ASR、Flow/LLM/Tool、TTS、音频与文本回传、客户端播放及打断之间的完整交接。平台/Worker 项目必须讲清任务在本地还是远端执行、提交什么、怎样排队、Worker 实际做什么、产物放哪里、怎样部署和回传状态。
 
-## 当前结论
-
-- 产品核心应该是**独立项目**，不是把能力直接塞进某个 Skill。
-- 第一正式入口应该是**CLI**，因为 `repo -> artifact` 最适合本地、CI 和可重复执行。
-- 给人的主产物是**每仓一个人类报告包**，其中 `index.html` 负责叙事，`report.json`、`evidence.json`、`modules.json` 负责证据与机器消费。
-- Skill 适合做**二期薄适配器**，在用户选中功能之后再导出阅读包和任务包。
-- 第一阶段只用 **Waku Agent** 做端到端验收，不急着覆盖所有语言和所有参考仓。
-
-## 当前不是完成态的部分
-
-- 还没有把 13 个参考仓全部变成正式的人类项目页 HTML；
-- 还没有把自动分析从 Python 研究原型完整迁到 Go；
-- 还没有做跨项目自动选型页、ACP 接入、看板派单和本地知识管理闭环。
-
-## Go 纵向切片
-
-当前可运行命令：
+## 最快使用：本地界面
 
 ```bash
-go run ./cmd/repo-teacher report \
-  --repo /Volumes/T7/workspace/ontology/graph/repo/waku-agent \
-  --profile /Volumes/T7/workspace/ontology/graph/dev/repo/profiles/waku-agent.json \
-  --output /Volumes/T7/workspace/ontology/graph/biz/docs/html/repo-projects/waku-agent
-
-go run ./cmd/repo-teacher verify \
-  --repo /Volumes/T7/workspace/ontology/graph/repo/waku-agent \
-  --profile /Volumes/T7/workspace/ontology/graph/dev/repo/profiles/waku-agent.json \
-  --bundle /Volumes/T7/workspace/ontology/graph/biz/docs/html/repo-projects/waku-agent
+cd /Volumes/T7/workspace/ontology/graph/dev/repo
+.venv/bin/repo-teacher ui --open
 ```
 
-它当前做的是：
+若 8787 端口被占用：
 
-- 严格读取并绑定已审阅 profile，明确区分人工功能语义与程序证据校验；
-- 验证源码路径和行范围；
-- 为每条源码证据计算内容哈希；
-- 原子生成 `index.html` + `report.json` + `evidence.json` + `modules.json` + `manifest.json`；
-- 用 `verify` 重放产物哈希、仓库快照、源码证据和 HTML/JSON/模块闭包。
+```bash
+.venv/bin/repo-teacher ui --port 0 --open
+```
 
-对应入口代码：
+界面中填写：
 
-- [main.go](/Volumes/T7/workspace/ontology/graph/dev/repo/cmd/repo-teacher/main.go)
-- [load.go](/Volumes/T7/workspace/ontology/graph/dev/repo/internal/projectreport/load.go)
-- [render.go](/Volumes/T7/workspace/ontology/graph/dev/repo/internal/projectreport/render.go)
+1. 源码仓库绝对路径。
+2. HTML 输出根目录。
+3. 报告名称；结果写到 `<输出根目录>/<报告名称>/index.html`。
+4. 执行后端：Codex 或 OpenCode。
+5. OpenCode 模式下选择 DeepSeek Flash 或 Pro，并输入 OpenRouter API Key。
+6. 点击“开始生成报告”，右侧实时显示六阶段进度和日志。
 
-## 文档分层
+API Key 仅注入本次 OpenCode 子进程的环境变量，不进入命令行参数、任务 JSON、日志、HTML 或本地配置文件。也可以在启动界面前设置 `OPENROUTER_API_KEY`，这样界面无需填写。
 
-- `docs/project-readings/`：逐仓阅读笔记和决策材料。
-- `docs/decisions/`：候选/已冻结 ADR。
-- `biz/docs/html/`：给人看的导航页和报告页。
-- `outputs/waku-agent/`：当前 Go 纵向切片产物。
+## OpenCode 与本机 NVM
 
-这份 README 只保留真实状态，不再把研究原型说成完整生产系统。
+本机 NVM 位于外接硬盘：
+
+```bash
+export NVM_DIR=/Volumes/T7/programe/env/nvm
+source "$NVM_DIR/nvm.sh"
+nvm use 22
+opencode --version
+```
+
+Repo Teacher 会依次从 `REPO_TEACHER_OPENCODE_BIN`、当前 `PATH`、`~/.local/bin` 和 NVM 版本目录寻找 OpenCode。
+
+## 直接使用 CLI
+
+Codex：
+
+```bash
+.venv/bin/repo-teacher report \
+  /absolute/path/to/repository \
+  --output /absolute/path/to/reports/project-name \
+  --provider codex \
+  --model-timeout 3600
+```
+
+OpenCode + DeepSeek Flash：
+
+```bash
+export OPENROUTER_API_KEY='在当前终端临时设置，不要写入仓库'
+export REPO_TEACHER_OPENCODE_MODEL='openrouter/deepseek/deepseek-v4-flash'
+.venv/bin/repo-teacher report \
+  /absolute/path/to/repository \
+  --output /absolute/path/to/reports/project-name \
+  --provider opencode \
+  --model-timeout 3600
+```
+
+DeepSeek Pro 使用 `openrouter/deepseek/deepseek-v4-pro`。
+
+## 报告阅读顺序
+
+1. **这是什么项目**：产品类型、用户、结果和差异点。
+2. **项目工程结构**：前端、后端、Worker、媒体、共享协议和目录边界。
+3. **产品主轴与交互图**：先建立项目的产品心智模型和端到端数据流。
+4. **业务功能**：用户能完成什么；框架项目则是开发者能构建或控制什么。
+5. **实现机制**：跨哪些模块完成，状态和控制权怎样传递。
+6. **真正难点**：不变量、失败方式、当前取舍和生产边界。
+7. **源码证据**：最后下钻到文件、行号、符号和静态关系。
+
+运维、治理、通用平台和工程能力默认折叠，不与核心业务功能并列。
+
+## 产物
+
+- `index.html`：主要人类报告，离线可读，交互图无需外部运行时。
+- `current/index.json`：当前固定版本的机器索引。
+- `current/human-report.json`：模型生成的业务功能与教程结构。
+- `current/capability-graph.json`：代码图和功能切片。
+- `current/analysis-pack.json`：有界证据包。
+
+根目录入口和 `current/` 由同一 generation 发布；不要手工修改生成文件。
+
+## 验证报告
+
+```bash
+.venv/bin/repo-teacher validate \
+  /absolute/path/to/reports/project-name/index.json \
+  --source /absolute/path/to/repository
+```
+
+根入口和 `current/index.json` 都应通过验证。报告中的性能、生产规模、运行可达性等结论只有在实际运行证据存在时才会标为已确认。

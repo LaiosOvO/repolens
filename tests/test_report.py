@@ -3,10 +3,131 @@ from __future__ import annotations
 import unittest
 
 from repo_teacher.artifacts import enrich_index
-from repo_teacher.report import _render_human_decision_guide, render_report
+from repo_teacher.report import (
+    _render_human_decision_guide,
+    _render_human_feature_chapter,
+    _render_project_overview,
+    render_report,
+)
 
 
 class ReportTest(unittest.TestCase):
+    def test_project_overview_uses_interaction_diagrams_and_an_engineering_table(self) -> None:
+        overview = {
+            "one_liner": "这是一个实时语音 Agent 运行时。",
+            "product_type": "开发框架",
+            "primary_user": "语音 Agent 开发者",
+            "problem": "把实时媒体和对话控制接起来",
+            "differentiator": "帧流运行时",
+            "core_product_axes": [
+                {
+                    "title": "实时语音会话运行时",
+                    "one_liner": "把采集、处理和回放连成一条实时链。",
+                    "user_outcome": "完成一轮低延迟语音交互",
+                    "capability_ids": ["voice"],
+                    "end_to_end_flow": [
+                        "客户端采集 PCM 音频",
+                        "Transport 转成输入帧",
+                        "Pipeline 依次处理",
+                        "输出帧回到客户端",
+                    ],
+                    "source_refs": [],
+                }
+            ],
+            "supporting_capability_ids": [],
+            "core_journey": [],
+            "architecture_style": "模块化单体",
+            "architecture_summary": "前端采集媒体，后端运行帧管线。",
+            "execution_model": "事件循环推进",
+            "frontend_backend_boundary": "前端只采集和播放，后端做推理。",
+            "data_and_state": "会话状态保存在进程内。",
+            "deployment_shape": "Python 服务加浏览器客户端。",
+            "engineering_structure": {
+                "repository_shape": "单仓 Python 包",
+                "architecture_pattern": "模块化单体",
+                "pattern_reasoning": "按运行能力分包。",
+                "frontend_organization": "templates/client：采集和播放。",
+                "backend_organization": "pipeline/transports：实时处理。",
+                "worker_and_async_organization": "workers：异步任务执行。",
+                "shared_contracts": "frames：跨模块消息契约。",
+                "dependency_rule": "适配器依赖 frames 和抽象基类。",
+                "media_organization": "transport 接入，audio 处理。",
+                "source_refs": [],
+            },
+            "runtime_components": [],
+            "code_organization": [],
+            "not_this": ["不是完整产品"],
+            "source_refs": [],
+        }
+
+        result = _render_project_overview(overview, "/tmp/pipecat")
+
+        self.assertNotIn("子功能先归类，不再把路由、鉴权和核心业务平铺成同一级", result)
+        self.assertIn('class="axis-interaction"', result)
+        self.assertIn("客户端采集 PCM 音频", result)
+        self.assertIn("输出帧回到客户端", result)
+        self.assertIn('class="engineering-layer-table"', result)
+        self.assertIn("前端代码", result)
+        self.assertIn("Worker / 异步执行", result)
+        self.assertLess(result.index("项目工程结构"), result.index("产品主轴与交互"))
+
+    def test_human_feature_chapter_leads_with_plain_language_and_visible_interaction(self) -> None:
+        feature = {"title": "多 Worker 协同", "summary": "多个 worker 协作完成任务。"}
+        chapter = {
+            "id": "workers",
+            "title": "多 Worker 协同",
+            "mechanism": "worker-bus",
+            "question": "任务怎样分发并收口？",
+            "use_when": "需要并发调用多个专用 worker",
+            "distinguish": "它不是固定 DAG 调度器。",
+            "runtime_story": {
+                "trigger": "父 worker 提交 job payload",
+                "owner": "WorkerBus 与目标 worker",
+                "output": "update、stream 与最终 response",
+                "consumer": "父 worker 或 UI",
+                "steps": [
+                    "父 worker 创建 job group",
+                    "bus 把请求放入目标 worker 的订阅队列",
+                    "目标 worker 执行业务定义的 job handler",
+                    "父 worker 聚合 response 或取消剩余任务",
+                ],
+            },
+            "construction": {"explanation": "通过 bus 连接 worker。", "objects": []},
+            "mechanism_model": {
+                "plain_summary": "它是一个让多个自治 worker 通过消息总线接活、回报进度并汇总结果的协作运行时。",
+                "storage": "活动 job group",
+                "write_path": "job request",
+                "read_path": "subscriber queue",
+                "control_loop": "异步消息循环",
+                "decision_rules": "按 target 路由",
+                "termination": "全部 response 或取消",
+                "dynamic_behavior": "业务可注册自己的 job handler",
+                "worked_example": [
+                    "一个 UI worker 把用户请求拆成两个业务 job。",
+                    "两个目标 worker 分别流式回传进度。",
+                    "父 worker 聚合结果后更新 UI。",
+                ],
+            },
+            "state_flow": [],
+            "difficulty_map": {"summary": "难点", "items": [], "unknowns": []},
+            "design_choices": [],
+            "boundary": {"supported": [], "unsupported": []},
+            "reuse_plan": {"take": [], "adapt": [], "avoid": [], "verify": []},
+        }
+        tutorial = {"human_chapter": chapter, "difficulty_map": chapter["difficulty_map"]}
+
+        result = _render_human_feature_chapter(feature, tutorial, {}, "/tmp/pipecat", 1)
+
+        self.assertIn("简单来说，这个功能就是", result)
+        self.assertIn('class="interaction-diagram"', result)
+        self.assertIn("父 worker 提交 job payload", result)
+        self.assertIn("目标 worker 执行业务定义的 job handler", result)
+        self.assertIn("比如，一次真实交互会这样发生", result)
+        self.assertLess(
+            result.index("比如，一次真实交互会这样发生"),
+            result.index("底层机制到底怎么工作"),
+        )
+
     def test_human_capabilities_are_grouped_by_product_axis_and_support_is_collapsed(self) -> None:
         features = [
             {

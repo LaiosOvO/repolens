@@ -19,9 +19,12 @@ from repo_teacher.cli import (
     _inventory_json_schema,
     _inventory_prompt,
     _inventory_shard_prompt,
+    _chapter_batch_prompt,
+    _project_overview_prompt,
     _require_inventory_scope,
     _add_project_navigation,
     _model_prompt,
+    _normalize_project_overview,
     _group_inventory_for_humans,
     _remaining_model_timeout,
     _rebind_reviewed_narrative,
@@ -31,6 +34,40 @@ from repo_teacher.indexer import _integrity_digest
 
 
 class CliTest(unittest.TestCase):
+    def test_project_overview_drops_a_duplicated_all_supporting_axis(self) -> None:
+        source_ref = {"path": "src/app.py", "line_start": 1, "line_end": 1, "claim": "evidence"}
+        overview = {
+            "project_overview": {
+                "capability_order": ["core", "support"],
+                "core_product_axes": [
+                    {"id": "core-axis", "capability_ids": ["core"], "source_refs": [source_ref]},
+                    {"id": "support-bucket", "capability_ids": ["support"], "source_refs": [source_ref]},
+                ],
+                "supporting_capability_ids": ["support"],
+                "source_refs": [source_ref, source_ref, source_ref],
+                "engineering_structure": {"source_refs": [source_ref]},
+                "runtime_components": [
+                    {"source_refs": [source_ref]},
+                    {"source_refs": [source_ref]},
+                ],
+                "code_organization": [
+                    {"path": "src", "source_refs": [source_ref]},
+                    {"path": "src", "source_refs": [source_ref]},
+                ],
+            }
+        }
+        packet = {"scope": {"allowed_source_paths": ["src/app.py"]}}
+        capabilities = [{"id": "core"}, {"id": "support"}]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            (source / "src").mkdir()
+            (source / "src" / "app.py").write_text("pass\n", encoding="utf-8")
+            result = _normalize_project_overview(payload=overview, packet=packet, capabilities=capabilities, source=source)
+
+        self.assertEqual(
+            [axis["id"] for axis in result["core_product_axes"]], ["core-axis"]
+        )
+
     def test_grouping_excludes_supporting_http_surface_from_product_capabilities(
         self,
     ) -> None:
@@ -710,6 +747,26 @@ class CliTest(unittest.TestCase):
         self.assertIn("串行轮次、半双工还是真全双工", prompt)
         self.assertIn("仅写“Router 决定路由”不合格", prompt)
         self.assertIn("human-report-schema.json", prompt)
+
+    def test_human_report_prompts_require_cross_capability_interactions(self) -> None:
+        overview_prompt = _project_overview_prompt(
+            Path("/tmp/overview-pack.json"), Path("/tmp/source"), ["voice", "flow"]
+        )
+        chapter_prompt = _chapter_batch_prompt(
+            Path("/tmp/chapter-pack.json"),
+            Path("/tmp/inventory.json"),
+            Path("/tmp/source"),
+            ["voice", "workers"],
+        )
+
+        self.assertIn("数据、控制权与状态", overview_prompt)
+        self.assertIn("语音帧管线把转写交给 Flow", overview_prompt)
+        self.assertIn("客户端怎样持续采集/送帧", overview_prompt)
+        self.assertIn("一键部署", overview_prompt)
+        self.assertIn("谁收到什么", chapter_prompt)
+        self.assertIn("媒体帧怎样变成 Flow 的上下文或事件", chapter_prompt)
+        self.assertIn("没有内置固定任务目录", chapter_prompt)
+        self.assertIn("任务怎样排队/持久化", chapter_prompt)
 
     def test_inventory_schema_does_not_cap_capability_count(self) -> None:
         schema = _inventory_json_schema()

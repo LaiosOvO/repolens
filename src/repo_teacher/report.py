@@ -677,21 +677,55 @@ def _render_project_overview(
     )
     engineering_source = first_source(engineering) if engineering else ""
     product_axes = refs(overview.get("core_product_axes"))
+
+    def flow_diagram(steps: object, *, class_name: str, label: str) -> str:
+        values = [
+            _text(item)
+            for item in steps
+            if isinstance(item, str) and _text(item)
+        ] if isinstance(steps, list) else []
+        if not values:
+            return '<p class="muted compact">当前证据不足以画出交互过程。</p>'
+        nodes = "".join(
+            '<li><span>' + f"{position:02d}" + '</span><p>'
+            + html.escape(value) + '</p></li>'
+            for position, value in enumerate(values, start=1)
+        )
+        return (
+            f'<div class="{html.escape(class_name)}" role="group" '
+            f'aria-label="{html.escape(label)}"><b>{html.escape(label)}</b>'
+            f'<ol>{nodes}</ol></div>'
+        )
+
     axes_html = "".join(
         '<article><header><span>产品主轴 ' + f"{position:02d}" + '</span><b>'
         + html.escape(_text(axis.get("title"), "未命名主轴"))
         + '</b></header><h3>' + html.escape(_text(axis.get("one_liner")))
-        + '</h3><p><strong>用户最终得到：</strong>'
-        + html.escape(_text(axis.get("user_outcome"))) + '</p><ol>'
-        + "".join(
-            f'<li>{html.escape(_text(step))}</li>'
-            for step in axis.get("end_to_end_flow", [])
-            if isinstance(step, str) and step.strip()
+        + '</h3>'
+        + flow_diagram(
+            axis.get("end_to_end_flow"),
+            class_name="axis-interaction",
+            label="交互图 · 数据、控制权与状态怎样移动",
         )
-        + '</ol><footer><span>'
+        + '<p class="axis-outcome"><strong>用户最终得到：</strong>'
+        + html.escape(_text(axis.get("user_outcome"))) + '</p><footer><span>'
         + f'{len(axis.get("capability_ids", [])) if isinstance(axis.get("capability_ids"), list) else 0} 个子能力'
         + '</span>' + first_source(axis) + '</footer></article>'
         for position, axis in enumerate(product_axes, start=1)
+    )
+
+    engineering_rows = (
+        ("前端代码", engineering.get("frontend_organization"), overview.get("frontend_backend_boundary")),
+        ("后端代码", engineering.get("backend_organization"), engineering.get("dependency_rule")),
+        ("Worker / 异步执行", engineering.get("worker_and_async_organization"), overview.get("execution_model")),
+        ("共享协议 / 类型", engineering.get("shared_contracts"), engineering.get("dependency_rule")),
+        ("语音 / 视频代码组织", engineering.get("media_organization"), overview.get("data_and_state")),
+    )
+    engineering_rows_html = "".join(
+        '<tr><th>' + html.escape(label) + '</th><td>'
+        + html.escape(_text(organization, "未发现独立实现。")) + '</td><td>'
+        + html.escape(_text(boundary, "当前证据没有证明额外交接边界。")) + '</td></tr>'
+        for label, organization, boundary in engineering_rows
     )
     supporting_count = len(
         overview.get("supporting_capability_ids", [])
@@ -711,12 +745,22 @@ def _render_project_overview(
         + '</strong></article><article><span>最不同的地方</span><strong>'
         + html.escape(_text(overview.get("differentiator")))
         + '</strong></article></div>'
-        '<div class="section-head architecture-head"><span class="kicker">01 · 先看产品主轴</span>'
-        '<h2>子功能先归类，不再把路由、鉴权和核心业务平铺成同一级。</h2></div>'
+        '<div class="section-head architecture-head"><span class="kicker">01 · 项目工程结构</span>'
+        '<h2>先看前端、后端、Worker、媒体与共享协议怎样组织。</h2></div>'
+        '<div class="engineering-structure"><div class="engineering-verdict"><span>仓库形态</span><strong>'
+        + html.escape(_text(engineering.get("repository_shape"), "未确认"))
+        + '</strong><span>架构模式</span><strong>'
+        + html.escape(_text(engineering.get("architecture_pattern"), "未确认"))
+        + '</strong><p>' + html.escape(_text(engineering.get("pattern_reasoning")))
+        + '</p>' + engineering_source + '</div><div class="engineering-table-wrap">'
+        '<table class="engineering-layer-table"><thead><tr><th>工程层</th><th>代码怎样组织 / 负责什么</th>'
+        '<th>和谁交接 / 依赖边界</th></tr></thead><tbody>' + engineering_rows_html
+        + '</tbody></table></div></div>'
+        '<div class="section-head architecture-head product-axis-head"><span class="kicker">02 · 产品主轴与交互</span></div>'
         '<div class="product-axis-grid">' + axes_html + '</div>'
         '<p class="supporting-count">另有 <b>' + str(supporting_count)
         + '</b> 个运维、治理或通用支撑能力，放到核心主轴之后阅读。</p>'
-        '<div class="section-head architecture-head"><span class="kicker">02 · 核心任务怎样跑完</span>'
+        '<div class="section-head architecture-head"><span class="kicker">03 · 核心任务怎样跑完</span>'
         '<h2>先沿一条真实用户旅程看清控制权和状态怎样移动。</h2></div>'
         '<ol class="project-journey">' + journey_html + '</ol>'
         '<div class="architecture-summary"><article><span>整体架构</span><h3>'
@@ -731,21 +775,6 @@ def _render_project_overview(
         + '</p></article><article><span>部署形态</span><p>'
         + html.escape(_text(overview.get("deployment_shape")))
         + '</p></article></div>'
-        '<div class="section-head architecture-head"><span class="kicker">03 · 项目工程结构</span>'
-        '<h2>前端、后端、Worker 与共享协议的代码怎样分层。</h2></div>'
-        '<div class="engineering-structure"><div class="engineering-verdict"><span>仓库形态</span><strong>'
-        + html.escape(_text(engineering.get("repository_shape"), "未确认"))
-        + '</strong><span>架构模式</span><strong>'
-        + html.escape(_text(engineering.get("architecture_pattern"), "未确认"))
-        + '</strong><p>' + html.escape(_text(engineering.get("pattern_reasoning")))
-        + '</p>' + engineering_source + '</div><div class="engineering-layers">'
-        + '<article><b>前端代码</b><p>' + html.escape(_text(engineering.get("frontend_organization"))) + '</p></article>'
-        + '<article><b>后端代码</b><p>' + html.escape(_text(engineering.get("backend_organization"))) + '</p></article>'
-        + '<article><b>Worker / 异步执行</b><p>' + html.escape(_text(engineering.get("worker_and_async_organization"))) + '</p></article>'
-        + '<article><b>共享协议 / 类型</b><p>' + html.escape(_text(engineering.get("shared_contracts"))) + '</p></article>'
-        + '<article><b>依赖规则</b><p>' + html.escape(_text(engineering.get("dependency_rule"))) + '</p></article>'
-        + '<article class="media-layer"><b>语音 / 视频代码组织</b><p>' + html.escape(_text(engineering.get("media_organization"))) + '</p></article>'
-        + '</div></div>'
         '<div class="section-head architecture-head"><span class="kicker">04 · 运行时组件</span>'
         '<h2>谁负责什么、怎样通信、状态放在哪里。</h2></div>'
         '<div class="runtime-component-grid">' + component_html + '</div>'
@@ -1334,7 +1363,6 @@ def _render_human_feature_chapter(
         + '</p></article>'
         for label, field in mechanism_fields
     )
-    mechanism = _text(chapter.get("mechanism"), "capability")
     plain_summary = _text(
         mechanism_model.get("plain_summary"),
         "当前证据还不足以概括这个功能的本质。",
@@ -1343,6 +1371,25 @@ def _render_human_feature_chapter(
     runtime_preview = " → ".join(
         _text(step) for step in runtime_steps[:4] if _text(step)
     ) or "当前没有足够证据还原运行过程。"
+    interaction_roles = (
+        ("触发", story.get("trigger")),
+        ("运行时接管", story.get("owner")),
+        ("产生", story.get("output")),
+        ("交给", story.get("consumer")),
+    )
+    interaction_role_html = "".join(
+        '<li><span>' + f"{role_position:02d}" + '</span><div><b>'
+        + html.escape(label) + '</b><p>'
+        + html.escape(_text(value, "未知")) + '</p></div></li>'
+        for role_position, (label, value) in enumerate(interaction_roles, start=1)
+    )
+    interaction_step_html = "".join(
+        '<li><span>' + f"{step_position:02d}" + '</span><p>'
+        + html.escape(_text(step)) + '</p></li>'
+        for step_position, step in enumerate(runtime_steps, start=1)
+        if _text(step)
+    )
+    worked_example = mechanism_model.get("worked_example")
     take_items = reuse.get("take", []) if isinstance(reuse.get("take"), list) else []
     adapt_items = reuse.get("adapt", []) if isinstance(reuse.get("adapt"), list) else []
     final_take = (
@@ -1356,9 +1403,9 @@ def _render_human_feature_chapter(
     return (
         f'<article class="feature-card human-feature-card" id="feature-{position:03d}">'
         '<div class="feature-card-head"><div>'
-        f'<span class="feature-index">功能 {position:02d} · {html.escape(mechanism)}</span>'
+        f'<span class="feature-index">功能 {position:02d} · 业务功能 · 源码静态确认</span>'
         f'<h3>{html.escape(human_title)}</h3>'
-        '<p class="feature-thesis"><span>本质一句话</span><strong>'
+        '<p class="feature-thesis"><span>先说结论</span><strong>简单来说，这个功能就是：'
         f'{html.escape(plain_summary)}</strong></p>'
         f'<p class="chapter-question">{html.escape(_text(chapter.get("question"), human_summary))}</p>'
         '</div><span class="confidence-badge exact">功能级源码讲解</span></div>'
@@ -1371,20 +1418,29 @@ def _render_human_feature_chapter(
         f'<p>{html.escape(_text(chapter.get("distinguish"), "差异尚未确认"))}</p>'
         f'<small>适用：{html.escape(_text(chapter.get("use_when"), "使用边界未知"))}</small></article></div></section>'
         '<section class="human-run"><span class="answer-label">一次任务完整怎么运行</span>'
-        '<div class="runtime-contract">'
-        f'<article><b>谁触发</b><p>{html.escape(_text(story.get("trigger"), "未知"))}</p></article>'
-        f'<article><b>谁接管</b><p>{html.escape(_text(story.get("owner"), "未知"))}</p></article>'
-        f'<article><b>产出什么</b><p>{html.escape(_text(story.get("output"), "未知"))}</p></article>'
-        f'<article><b>谁消费</b><p>{html.escape(_text(story.get("consumer"), "未知"))}</p></article></div>'
-        f'{_human_list(runtime_steps, "没有足够证据还原运行过程。")}</section>'
+        '<div class="interaction-diagram" role="group" aria-label="一次任务的交互图">'
+        '<div class="interaction-diagram-head"><b>交互图</b><span>谁触发 → 谁接管 → 产生什么 → 谁继续消费</span></div>'
+        f'<ol class="interaction-roles">{interaction_role_html}</ol>'
+        '<div class="interaction-detail"><b>内部怎样一步步推进</b>'
+        f'<ol>{interaction_step_html}</ol></div></div>'
+        '<div class="interaction-explanation"><b>为什么要这样串起来</b><p>'
+        f'{html.escape(_text(construction.get("explanation"), "当前证据没有解释模块之间为什么这样交接。"))}'
+        '</p><dl><dt>持续推进靠什么</dt><dd>'
+        f'{html.escape(_text(mechanism_model.get("control_loop"), "未确认"))}</dd>'
+        '<dt>谁决定下一步</dt><dd>'
+        f'{html.escape(_text(mechanism_model.get("decision_rules"), "未确认"))}</dd>'
+        '<dt>何时结束或打断</dt><dd>'
+        f'{html.escape(_text(mechanism_model.get("termination"), "未确认"))}</dd>'
+        '<dt>运行中能否改变</dt><dd>'
+        f'{html.escape(_text(mechanism_model.get("dynamic_behavior"), "未确认"))}</dd></dl></div>'
+        '<div class="visible-example"><b>比如，一次真实交互会这样发生</b>'
+        f'{_human_list(worked_example, "当前没有足够证据给出完整例子。")}</div></section>'
         '<details class="human-deep-dive mechanism-details"><summary><span>01</span><div><b>底层机制到底怎么工作</b>'
         '<small>数据、控制循环、路由、结束条件与状态变化</small></div></summary><div class="human-deep-body">'
         '<div class="mechanism-verdict"><span>先说结论</span><strong>'
         f'{html.escape(plain_summary)}'
         '</strong></div>'
         f'<div class="mechanism-grid">{mechanism_html}</div>'
-        '<div class="worked-example"><b>用一个具体例子串起来</b>'
-        f'{_human_list(mechanism_model.get("worked_example"), "当前没有足够证据给出完整例子。")}</div>'
         '<h4>核心机制怎么构建</h4>'
         f'<p class="chapter-lead">{html.escape(_text(construction.get("explanation"), "构建方式未知。"))}</p>'
         f'<div class="object-grid">{object_html}</div>'
@@ -1788,16 +1844,16 @@ def render_report(index: dict[str, Any]) -> str:
     @media(max-width:900px){header,main{padding-left:20px;padding-right:20px}.hero,.section-head,.overview,.decision-summary{grid-template-columns:1fr}.human-capability-grid,.quick-grid{grid-template-columns:1fr 1fr}.feature-directory,.feature-answer-grid,.evidence-columns,.technology-assessment,.artifact-grid,.reference-grid,.runtime-contract,.object-grid,.reuse-grid,.choice-grid{grid-template-columns:1fr 1fr}.metrics{grid-template-columns:repeat(3,1fr)}.module-grid{grid-template-columns:1fr 1fr}.row{grid-template-columns:1fr}.identity{align-self:auto}}
     @media(max-width:560px){header,main{padding-left:14px;padding-right:14px}header{align-items:flex-start}.snapshot{max-width:140px;text-align:right}.hero{padding-top:40px}.human-capability-grid{grid-template-columns:1fr}.human-capability{min-height:0}.quick-grid{grid-template-columns:1fr 1fr}.feature-nav{grid-template-columns:30px minmax(0,1fr)}.feature-nav em{grid-column:2;justify-self:start}.feature-card{padding:16px}.feature-card-head{display:grid}.implementation-block,.source-block,.answer-block,.human-chapter{padding:15px!important}.feature-verdict{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.module-grid{grid-template-columns:1fr}.reading-step{grid-template-columns:36px minmax(0,1fr)}.reading-step em{grid-column:2}.toolbar button{flex:1}.toolbar input{flex-basis:100%;min-width:0}.row{gap:8px}.source-contract,.tutorial-contract{grid-template-columns:1fr}.two-column-explanation,.runtime-contract,.object-grid,.choice-grid,.boundary-grid,.reuse-grid,.mechanism-grid{grid-template-columns:1fr}.mechanism-grid article:last-child{grid-column:auto}.codemap-edges li{grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr)}.evidence-chapter>summary{grid-template-columns:1fr}.evidence-chapter>summary em{justify-self:start}.decision-table-wrap{overflow:visible;border:0}.decision-table,.decision-table tbody,.decision-table tr,.decision-table th,.decision-table td{display:block;width:100%;min-width:0}.decision-table thead{display:none}.decision-table tr{margin-bottom:14px;padding:15px;border:1px solid var(--line);border-radius:16px;background:#fff}.decision-table th,.decision-table td{padding:7px 0;border:0;overflow-wrap:anywhere}.decision-table td:before{content:attr(data-label);display:block;margin-bottom:2px;color:var(--orange);font-size:10px;font-weight:850;letter-spacing:.06em}}
     .source-link{display:inline;max-width:100%;margin:0 7px 7px 0;color:var(--green);text-decoration:none;white-space:normal;overflow-wrap:anywhere}.source-link:hover{text-decoration:underline}
-    .project-overview{padding:54px 0 18px}.project-overview>.section-head{margin-bottom:22px}.project-definition{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:var(--line)}.project-definition article{display:grid;gap:9px;padding:24px;background:#fff}.project-definition span,.architecture-summary span,.runtime-component-grid header span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.project-definition strong{font:750 1.12rem/1.55 Georgia,"Songti SC",serif}.architecture-head{margin-top:52px}.project-journey{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;margin:0;padding:1px;list-style:none;border-radius:20px;background:var(--green);overflow:hidden}.project-journey li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:22px;background:#fff}.project-journey>li>b{color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.project-journey span{color:var(--green);font-size:11px;font-weight:850}.project-journey h4{margin:6px 0 10px;font-size:1rem}.project-journey p,.project-journey small{margin:0;color:var(--muted)}.architecture-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.architecture-summary article{padding:22px;border:1px solid var(--line);border-radius:17px;background:#fafaf6}.architecture-summary article:first-child{grid-column:span 2;background:var(--green-soft)}.architecture-summary h3{margin:10px 0 8px;font:750 1.25rem/1.35 Georgia,"Songti SC",serif}.architecture-summary p{margin:8px 0 0;color:var(--muted)}.runtime-component-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.runtime-component-grid article{padding:22px;border:1px solid var(--line);border-radius:18px}.runtime-component-grid h4{margin:8px 0 12px;font-size:1.2rem}.runtime-component-grid p{color:var(--muted)}.runtime-component-grid dl{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px 12px}.runtime-component-grid dt{color:var(--green);font-size:12px;font-weight:800}.runtime-component-grid dd{margin:0}.code-organization-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px}.code-organization{width:100%;min-width:780px;border-collapse:collapse;background:#fff}.code-organization th,.code-organization td{padding:16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}.code-organization th{width:20%}.code-organization th code,.code-organization th small{display:block;overflow-wrap:anywhere}.code-organization th small{margin-top:6px;color:var(--orange)}.overview-boundary{display:grid;grid-template-columns:.8fr 1.2fr;gap:12px;margin-top:14px}.overview-boundary>div,.overview-boundary details{padding:20px;border:1px solid var(--line);border-radius:17px;background:#fafaf6}.overview-boundary ul,.overview-boundary ol{margin-bottom:0;padding-left:20px}.overview-boundary details summary{cursor:pointer;color:var(--green);font-weight:850}.overview-boundary details li{margin:10px 0}.overview-boundary details li span{display:block;margin-top:4px;color:var(--muted)}
-    .product-axis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}.product-axis-grid>article{display:grid;gap:13px;padding:24px;border:1px solid var(--line);border-radius:20px;background:var(--green-soft)}.product-axis-grid header{position:static;display:grid;gap:7px;padding:0;border:0;background:transparent;backdrop-filter:none}.product-axis-grid header span,.product-capability-group>header>span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.product-axis-grid header b{font:750 1.35rem/1.35 Georgia,"Songti SC",serif}.product-axis-grid h3,.product-axis-grid p{margin:0}.product-axis-grid h3{font-size:1.05rem}.product-axis-grid ol{margin:0;padding-left:20px}.product-axis-grid footer{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0;padding-top:13px;border-top:1px solid rgba(11,107,76,.18);color:var(--muted)}.supporting-count{margin:14px 0 0;color:var(--muted)}.product-capability-group{margin:26px 0 0;padding:0}.product-capability-group>header{position:static;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 20px;margin-bottom:13px;padding:20px 22px;border:1px solid var(--line);border-left:6px solid var(--green);border-radius:0 17px 17px 0;background:var(--green-soft);backdrop-filter:none}.product-capability-group>header>span{grid-row:1/4}.product-capability-group>header h3,.product-capability-group>header p{margin:0}.product-capability-group>header h3{font-size:1.5rem}.product-capability-group>header p{color:var(--muted)}.product-capability-group>header strong{font-size:.9rem}.supporting-capabilities{margin-top:26px;border:1px solid var(--line);border-radius:18px;background:#fafaf6}.supporting-capabilities>summary{display:grid;grid-template-columns:max-content minmax(0,1fr) auto;gap:12px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none}.supporting-capabilities>summary::-webkit-details-marker{display:none}.supporting-capabilities>summary span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.supporting-capabilities>summary small{color:var(--muted)}.supporting-capabilities>.human-capability-grid{padding:0 18px 18px}.engineering-structure{display:grid;grid-template-columns:.75fr 1.25fr;gap:12px}.engineering-verdict,.engineering-layers{border:1px solid var(--line);border-radius:18px;background:#fff}.engineering-verdict{display:grid;align-content:start;gap:8px;padding:24px;background:var(--green-soft)}.engineering-verdict>span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.engineering-verdict strong{margin-bottom:12px;font:750 1.2rem/1.4 Georgia,"Songti SC",serif}.engineering-verdict p{color:var(--muted)}.engineering-layers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:hidden}.engineering-layers article{padding:20px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}.engineering-layers article:nth-child(2n){border-right:0}.engineering-layers article:nth-last-child(-n+2){border-bottom:0}.engineering-layers b{color:var(--green)}.engineering-layers p{margin:8px 0 0;color:var(--muted)}.engineering-layers .media-layer{background:var(--orange-soft)}
+    .project-overview{padding:54px 0 18px}.project-overview>.section-head{margin-bottom:22px}.project-definition{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:var(--line)}.project-definition article{display:grid;gap:9px;padding:24px;background:#fff}.project-definition span,.architecture-summary span,.runtime-component-grid header span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.project-definition strong{font:750 1.12rem/1.55 Georgia,"Songti SC",serif}.architecture-head{margin-top:52px}.project-journey{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;margin:0;padding:1px;list-style:none;border-radius:20px;background:var(--green);overflow:hidden}.project-journey li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:22px;background:#fff}.project-journey>li>b{color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.project-journey span{color:var(--green);font-size:11px;font-weight:850}.project-journey h4{margin:6px 0 10px;font-size:1rem}.project-journey p,.project-journey small{margin:0;color:var(--muted)}.architecture-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px;min-width:0}.architecture-summary article{min-width:0;padding:22px;border:1px solid var(--line);border-radius:17px;background:#fafaf6;overflow-wrap:anywhere}.architecture-summary article:first-child{grid-column:span 2;background:var(--green-soft)}.architecture-summary h3{max-width:100%;margin:10px 0 8px;font:750 1.25rem/1.35 Georgia,"Songti SC",serif;overflow-wrap:anywhere}.architecture-summary p{margin:8px 0 0;color:var(--muted);overflow-wrap:anywhere}.runtime-component-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.runtime-component-grid article{padding:22px;border:1px solid var(--line);border-radius:18px}.runtime-component-grid h4{margin:8px 0 12px;font-size:1.2rem}.runtime-component-grid p{color:var(--muted)}.runtime-component-grid dl{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px 12px}.runtime-component-grid dt{color:var(--green);font-size:12px;font-weight:800}.runtime-component-grid dd{margin:0}.code-organization-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px}.code-organization{width:100%;min-width:780px;border-collapse:collapse;background:#fff}.code-organization th,.code-organization td{padding:16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}.code-organization th{width:20%}.code-organization th code,.code-organization th small{display:block;overflow-wrap:anywhere}.code-organization th small{margin-top:6px;color:var(--orange)}.overview-boundary{display:grid;grid-template-columns:.8fr 1.2fr;gap:12px;margin-top:14px}.overview-boundary>div,.overview-boundary details{padding:20px;border:1px solid var(--line);border-radius:17px;background:#fafaf6}.overview-boundary ul,.overview-boundary ol{margin-bottom:0;padding-left:20px}.overview-boundary details summary{cursor:pointer;color:var(--green);font-weight:850}.overview-boundary details li{margin:10px 0}.overview-boundary details li span{display:block;margin-top:4px;color:var(--muted)}
+    .product-axis-head{display:block}.product-axis-grid{display:grid;grid-template-columns:1fr;gap:14px}.product-axis-grid>article{display:grid;gap:15px;padding:26px;border:1px solid var(--line);border-radius:20px;background:var(--green-soft)}.product-axis-grid header{position:static;display:grid;gap:7px;padding:0;border:0;background:transparent;backdrop-filter:none}.product-axis-grid header span,.product-capability-group>header>span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.product-axis-grid header b{font:750 1.45rem/1.35 Georgia,"Songti SC",serif}.product-axis-grid h3,.product-axis-grid p{margin:0}.product-axis-grid h3{max-width:920px;font-size:1.08rem}.axis-interaction{padding:18px;border:1px solid rgba(11,107,76,.2);border-radius:16px;background:#fff}.axis-interaction>b{display:block;margin-bottom:13px;color:var(--green);font-size:.82rem}.axis-interaction ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:28px;margin:0;padding:0;list-style:none}.axis-interaction li{position:relative;min-width:0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fafaf6}.axis-interaction li:not(:last-child):after{position:absolute;right:-22px;top:50%;content:"→";color:var(--orange);font-weight:900;transform:translateY(-50%)}.axis-interaction li span{color:var(--orange);font:850 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.axis-interaction li p{margin-top:7px;overflow-wrap:anywhere}.axis-outcome{padding-top:12px;border-top:1px solid rgba(11,107,76,.18)}.product-axis-grid footer{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0;padding-top:13px;border-top:1px solid rgba(11,107,76,.18);color:var(--muted)}.supporting-count{margin:14px 0 0;color:var(--muted)}.product-capability-group{margin:26px 0 0;padding:0}.product-capability-group>header{position:static;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 20px;margin-bottom:13px;padding:20px 22px;border:1px solid var(--line);border-left:6px solid var(--green);border-radius:0 17px 17px 0;background:var(--green-soft);backdrop-filter:none}.product-capability-group>header>span{grid-row:1/4}.product-capability-group>header h3,.product-capability-group>header p{margin:0}.product-capability-group>header h3{font-size:1.5rem}.product-capability-group>header p{color:var(--muted)}.product-capability-group>header strong{font-size:.9rem}.supporting-capabilities{margin-top:26px;border:1px solid var(--line);border-radius:18px;background:#fafaf6}.supporting-capabilities>summary{display:grid;grid-template-columns:max-content minmax(0,1fr) auto;gap:12px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none}.supporting-capabilities>summary::-webkit-details-marker{display:none}.supporting-capabilities>summary span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.supporting-capabilities>summary small{color:var(--muted)}.supporting-capabilities>.human-capability-grid{padding:0 18px 18px}.engineering-structure{display:grid;grid-template-columns:.65fr 1.35fr;gap:12px}.engineering-verdict,.engineering-table-wrap{min-width:0;border:1px solid var(--line);border-radius:18px;background:#fff}.engineering-verdict{display:grid;align-content:start;gap:8px;padding:24px;background:var(--green-soft)}.engineering-verdict>span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.engineering-verdict strong{margin-bottom:12px;font:750 1.2rem/1.4 Georgia,"Songti SC",serif}.engineering-verdict p{color:var(--muted)}.engineering-table-wrap{overflow-x:auto}.engineering-layer-table{width:100%;min-width:720px;border-collapse:collapse}.engineering-layer-table th,.engineering-layer-table td{padding:16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.engineering-layer-table thead th{background:#18201b;color:#fff;font-size:.78rem}.engineering-layer-table tbody th{width:18%;color:var(--green)}.engineering-layer-table td:nth-child(2){width:46%}.engineering-layer-table tr:last-child th,.engineering-layer-table tr:last-child td{border-bottom:0}
     .mechanism-verdict{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:14px;align-items:start;margin-bottom:18px;padding:18px;border-left:6px solid var(--orange);border-radius:0 14px 14px 0;background:#fff}.mechanism-verdict span{color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em}.mechanism-verdict strong{font-size:1.18rem;line-height:1.65}
-    .feature-thesis{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:11px 16px;align-items:start;margin:18px 0 0;padding:18px 20px;border-left:5px solid var(--orange);border-radius:0 14px 14px 0;background:var(--orange-soft)}.feature-thesis span{padding-top:4px;color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.feature-thesis strong{font:750 1.2rem/1.58 Georgia,"Songti SC",serif}.chapter-question{margin:13px 0 0;color:var(--muted)}.human-glance{margin-top:18px;padding:24px!important;border-radius:20px;background:#18201b;color:#fff}.human-glance>.answer-label{color:#ff9a70}.glance-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:1px;margin-top:16px;overflow:hidden;border-radius:14px;background:#3b443f}.glance-grid article{display:grid;align-content:start;gap:9px;padding:20px;background:#202923}.glance-grid article b{color:#8bd5b4;font-size:.78rem}.glance-grid article strong{font:700 1.18rem/1.55 Georgia,"Songti SC",serif}.glance-grid article p,.glance-grid article small{margin:0;color:#d5ddd8}.human-run{margin-top:14px;padding:22px!important;border:1px solid var(--line);border-radius:18px;background:#fafaf6}.human-run>.answer-label{display:block;margin-bottom:12px}.human-run .human-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:12px;padding:0;counter-reset:run-step;list-style:none}.human-run .human-list li{position:relative;padding:13px 17px 13px 46px;border-top:1px solid var(--line);counter-increment:run-step}.human-run .human-list li:before{position:absolute;left:12px;content:counter(run-step,decimal-leading-zero);color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.human-deep-dive{margin-top:12px;border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden}.human-deep-dive>summary{display:grid;grid-template-columns:42px minmax(0,1fr) 24px;gap:15px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none}.human-deep-dive>summary::-webkit-details-marker{display:none}.human-deep-dive>summary>span{color:var(--orange);font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.human-deep-dive>summary b,.human-deep-dive>summary small{display:block}.human-deep-dive>summary b{font-size:1.12rem}.human-deep-dive>summary small{margin-top:5px;color:var(--muted)}.human-deep-dive>summary:after{content:"+";color:var(--green);font-size:1.4rem}.human-deep-dive[open]>summary:after{content:"−"}.human-deep-dive[open]>summary{background:#fafaf6}.human-deep-body{padding:22px;border-top:1px solid var(--line)}.human-deep-body>h4{margin:26px 0 13px;font-size:1.15rem}.human-deep-body>h4:first-child{margin-top:0}.human-recap{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;align-items:baseline;margin-top:14px;padding:18px 20px;border-radius:16px;background:var(--green-soft)}.human-recap>span{grid-row:1/3;color:var(--green);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.human-recap strong{font:750 1rem/1.55 Georgia,"Songti SC",serif}.human-recap p{margin:0;color:var(--muted);font-size:.88rem}.human-recap p b{color:var(--ink)}
+    .feature-thesis{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:11px 16px;align-items:start;margin:18px 0 0;padding:18px 20px;border-left:5px solid var(--orange);border-radius:0 14px 14px 0;background:var(--orange-soft)}.feature-thesis span{padding-top:4px;color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.feature-thesis strong{font:750 1.2rem/1.58 Georgia,"Songti SC",serif}.chapter-question{margin:13px 0 0;color:var(--muted)}.human-glance{margin-top:18px;padding:24px!important;border-radius:20px;background:#18201b;color:#fff}.human-glance>.answer-label{color:#ff9a70}.glance-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:1px;margin-top:16px;overflow:hidden;border-radius:14px;background:#3b443f}.glance-grid article{display:grid;align-content:start;gap:9px;padding:20px;background:#202923}.glance-grid article b{color:#8bd5b4;font-size:.78rem}.glance-grid article strong{font:700 1.18rem/1.55 Georgia,"Songti SC",serif}.glance-grid article p,.glance-grid article small{margin:0;color:#d5ddd8}.human-run{margin-top:14px;padding:22px!important;border:1px solid var(--line);border-radius:18px;background:#fafaf6}.human-run>.answer-label{display:block;margin-bottom:12px}.interaction-diagram{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:#fff}.interaction-diagram-head{display:flex;justify-content:space-between;gap:16px;padding:15px 17px;background:#18201b;color:#fff}.interaction-diagram-head b{color:#8bd5b4}.interaction-diagram-head span{color:#d5ddd8;font-size:.8rem}.interaction-roles{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;margin:0!important;padding:0!important;list-style:none!important;counter-reset:none!important}.interaction-roles li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:9px;padding:16px!important;border:0!important;border-right:1px solid var(--line)!important}.interaction-roles li:last-child{border-right:0!important}.interaction-roles li:before{content:none!important}.interaction-roles li span{color:var(--orange);font:850 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.interaction-roles li b{color:var(--green)}.interaction-roles li p{margin:5px 0 0}.interaction-detail{padding:17px;border-top:1px solid var(--line);background:#fafaf6}.interaction-detail>b{color:var(--green)}.interaction-detail ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;margin:13px 0 0;padding:1px;list-style:none;background:var(--line)}.interaction-detail li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;padding:13px;background:#fff}.interaction-detail li span{color:var(--orange);font:850 10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.interaction-detail li p{margin:0}.interaction-explanation{margin-top:12px;padding:18px;border-left:5px solid var(--green);border-radius:0 14px 14px 0;background:#fff}.interaction-explanation>b{color:var(--green)}.interaction-explanation>p{margin:8px 0 14px}.interaction-explanation dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:7px 14px;margin:0}.interaction-explanation dt{color:var(--orange);font-weight:800}.interaction-explanation dd{margin:0}.visible-example{margin-top:12px;padding:18px;border-radius:14px;background:var(--orange-soft)}.visible-example>b{color:var(--green)}.visible-example .human-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:10px;padding:0;counter-reset:example-step;list-style:none}.visible-example .human-list li{position:relative;padding:13px 14px 13px 42px;border-top:1px solid rgba(221,84,43,.2);counter-increment:example-step}.visible-example .human-list li:before{position:absolute;left:10px;content:counter(example-step,decimal-leading-zero);color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.human-deep-dive{margin-top:12px;border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden}.human-deep-dive>summary{display:grid;grid-template-columns:42px minmax(0,1fr) 24px;gap:15px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none}.human-deep-dive>summary::-webkit-details-marker{display:none}.human-deep-dive>summary>span{color:var(--orange);font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.human-deep-dive>summary b,.human-deep-dive>summary small{display:block}.human-deep-dive>summary b{font-size:1.12rem}.human-deep-dive>summary small{margin-top:5px;color:var(--muted)}.human-deep-dive>summary:after{content:"+";color:var(--green);font-size:1.4rem}.human-deep-dive[open]>summary:after{content:"−"}.human-deep-dive[open]>summary{background:#fafaf6}.human-deep-body{padding:22px;border-top:1px solid var(--line)}.human-deep-body>h4{margin:26px 0 13px;font-size:1.15rem}.human-deep-body>h4:first-child{margin-top:0}.human-recap{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;align-items:baseline;margin-top:14px;padding:18px 20px;border-radius:16px;background:var(--green-soft)}.human-recap>span{grid-row:1/3;color:var(--green);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.human-recap strong{font:750 1rem/1.55 Georgia,"Songti SC",serif}.human-recap p{margin:0;color:var(--muted);font-size:.88rem}.human-recap p b{color:var(--ink)}
     .difficulty-card>summary div{display:grid;gap:5px}.difficulty-card>summary small{display:block;color:var(--muted);font-weight:500;line-height:1.5}.difficulty-sequence{display:grid;gap:0}.difficulty-sequence>section{display:grid;grid-template-columns:minmax(150px,.28fr) minmax(0,1fr);gap:20px;padding:18px 0!important;border-bottom:1px solid var(--line)}.difficulty-sequence>section:last-child{border-bottom:0}.difficulty-sequence b,.difficulty-footer b{color:var(--green)}.difficulty-sequence p,.difficulty-sequence ol{margin:0}.difficulty-sequence ol{padding-left:20px}.difficulty-proof{margin-top:8px;padding:14px;border-radius:12px;background:var(--orange-soft)}.difficulty-proof>summary{cursor:pointer;color:var(--green);font-weight:800}.difficulty-proof>ol{margin-bottom:0}.difficulty-footer{margin-top:14px}
     @media(max-width:560px){.mechanism-verdict{grid-template-columns:1fr;gap:5px;padding:14px}.mechanism-verdict strong{font-size:1.05rem}}
-    @media(max-width:900px){.glance-grid{grid-template-columns:1fr}.human-run .runtime-contract{grid-template-columns:1fr 1fr}.human-run .human-list{grid-template-columns:1fr 1fr}.runtime-component-grid,.architecture-summary,.overview-boundary{grid-template-columns:1fr}.architecture-summary article:first-child{grid-column:auto}}
+    @media(max-width:900px){.glance-grid{grid-template-columns:1fr}.interaction-roles{grid-template-columns:1fr 1fr!important}.interaction-roles li:nth-child(2){border-right:0!important}.interaction-roles li{border-bottom:1px solid var(--line)!important}.visible-example .human-list{grid-template-columns:1fr 1fr}.runtime-component-grid,.architecture-summary,.overview-boundary{grid-template-columns:1fr}.architecture-summary article:first-child{grid-column:auto}}
     @media(max-width:900px){.engineering-structure{grid-template-columns:1fr}}
-    @media(max-width:560px){.product-axis-grid{grid-template-columns:1fr}.product-capability-group>header{grid-template-columns:1fr}.product-capability-group>header>span{grid-row:auto}.supporting-capabilities>summary{grid-template-columns:1fr}.engineering-layers{grid-template-columns:1fr}.engineering-layers article{border-right:0!important;border-bottom:1px solid var(--line)!important}.engineering-layers article:last-child{border-bottom:0!important}}
-    @media(max-width:560px){.feature-thesis,.human-recap{grid-template-columns:1fr;padding:15px}.human-recap>span{grid-row:auto}.human-glance,.human-run,.human-deep-body{padding:16px!important}.human-run .runtime-contract,.human-run .human-list{grid-template-columns:1fr}.human-deep-dive>summary{grid-template-columns:30px minmax(0,1fr) 20px;padding:17px 15px}.difficulty-card>summary{grid-template-columns:1fr auto}.difficulty-card>summary>span{grid-column:1/-1}.difficulty-sequence>section{grid-template-columns:1fr;gap:8px}.difficulty-footer{grid-template-columns:1fr}.project-definition{grid-template-columns:1fr}.project-overview{padding-top:34px}.project-journey{grid-template-columns:1fr}.code-organization,.code-organization tbody,.code-organization tr,.code-organization th,.code-organization td{display:block;width:100%;min-width:0}.code-organization thead{display:none}.code-organization tr{padding:14px;border-bottom:1px solid var(--line)}.code-organization th,.code-organization td{padding:6px 0;border:0}}
+    @media(max-width:560px){.product-axis-grid{grid-template-columns:1fr}.axis-interaction ol{grid-template-columns:1fr;gap:10px}.axis-interaction li:not(:last-child):after{right:auto;top:auto;left:50%;bottom:-15px;transform:translateX(-50%) rotate(90deg)}.product-capability-group>header{grid-template-columns:1fr}.product-capability-group>header>span{grid-row:auto}.supporting-capabilities>summary{grid-template-columns:1fr}.engineering-table-wrap{overflow:visible}.engineering-layer-table,.engineering-layer-table tbody,.engineering-layer-table tr,.engineering-layer-table th,.engineering-layer-table td{display:block;width:100%;min-width:0}.engineering-layer-table thead{display:none}.engineering-layer-table tr{padding:13px;border-bottom:1px solid var(--line)}.engineering-layer-table th,.engineering-layer-table td{padding:5px 0;border:0}.engineering-layer-table td:last-child{color:var(--muted)}}
+    @media(max-width:560px){.feature-thesis,.human-recap{grid-template-columns:1fr;padding:15px}.human-recap>span{grid-row:auto}.human-glance,.human-run,.human-deep-body{padding:16px!important}.interaction-diagram-head{display:grid}.interaction-roles{grid-template-columns:1fr!important}.interaction-roles li{border-right:0!important}.interaction-explanation dl{grid-template-columns:1fr;gap:3px}.interaction-explanation dd{margin-bottom:8px}.visible-example .human-list{grid-template-columns:1fr}.human-deep-dive>summary{grid-template-columns:30px minmax(0,1fr) 20px;padding:17px 15px}.difficulty-card>summary{grid-template-columns:1fr auto}.difficulty-card>summary>span{grid-column:1/-1}.difficulty-sequence>section{grid-template-columns:1fr;gap:8px}.difficulty-footer{grid-template-columns:1fr}.project-definition{grid-template-columns:1fr}.project-overview{padding-top:34px}.project-journey{grid-template-columns:1fr}.code-organization,.code-organization tbody,.code-organization tr,.code-organization th,.code-organization td{display:block;width:100%;min-width:0}.code-organization thead{display:none}.code-organization tr{padding:14px;border-bottom:1px solid var(--line)}.code-organization th,.code-organization td{padding:6px 0;border:0}}
   </style>
 </head>
 <body><div class="shell">

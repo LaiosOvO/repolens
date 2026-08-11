@@ -1,0 +1,211 @@
+{
+  "id": "waku-agent",
+  "name": "Waku Agent",
+  "tagline": "一个本地优先的个人 Agent：把推理循环、长期记忆、图工作流、多通道和本地语音放在同一套运行时里。",
+  "description": "这份页面先解释 Waku 作为产品提供什么，再把每项功能落到当前完整 clone 的源码。它是 Repo Teacher 第一阶段唯一端到端验收仓，不参与参考项目排名。",
+  "audience": "想研究本地 Agent、记忆、Graph、Gateway、Voice、Tools/MCP、模型适配与评测门的人",
+  "product_form": "Python CLI + 本地 Dashboard + Gateway 进程",
+  "license": "MIT",
+  "remote": "https://github.com/ShenSeanChen/waku-agent",
+  "highlights": [
+    "主循环不依赖大型 Agent 框架，直接管理模型回合、工具调用和停止条件。",
+    "Memory、Graph 和 Gateway 是独立模块，可以分别研究，不需要整仓照搬。",
+    "Voice 是本地 ASR/TTS 串联，不是端到端全双工语音模型。"
+  ],
+  "architecture_summary": "Waku 是一个本地模块化单体：显式 Agent Loop 负责单回合推理，Memory、Graph、Gateway、Voice、Tools、Provider 和 Ops 通过清晰的 Python 模块接入同一个应用门面。它强调可读和本地运行，不提供分布式控制面、进程级沙箱或持久任务调度。",
+  "strengths": [
+    "功能边界清晰，能分别阅读 Loop、Memory、Graph、Gateway 和 Voice，而不必先理解大型框架。",
+    "本地优先，核心路径有显式数据结构、停止条件、事件和评测门，便于审计。",
+    "产品面较完整：CLI、Dashboard、外部通道、语音、模型适配与评测可以串成真实个人 Agent。"
+  ],
+  "limitations": [
+    "Graph、Gateway 和 Loop 主要是单进程/内存执行，不等于可恢复的长任务控制面。",
+    "工具、MCP、Dashboard 和通道隔离不是安全沙箱，生产环境仍需授权、配额与审计。",
+    "Voice 采用分段录音、ASR、Agent、TTS 串联，不具备全双工、打断和回声消除。"
+  ],
+  "reference_fit": "适合作为本地个人 Agent 的产品功能基线，以及 Loop、Memory、Graph、Gateway、Voice 等模块的入门实现参考；不适合直接充当多机器任务编排器或零信任执行平台。",
+  "comparison_questions": [
+    "另一个项目是否补上了持久 checkpoint、任务恢复、幂等和跨机器 worker？",
+    "知识与记忆是否带来源、冲突、删除和版本治理，而不只是本地召回？",
+    "语音是否真正支持流式 VAD/ASR、可打断 TTS、回声消除和全双工状态？",
+    "工具执行是否有独立进程、最小权限、审批、资源配额和审计链？"
+  ],
+  "conclusions": [
+    "记住它的核心价值是“完整而可读的本地个人 Agent 产品面”，不是分布式 Agent 平台。",
+    "优先分别研究 Agent Loop、Memory、Graph 和 Gateway 的边界；这些模块比整仓复制更有参考价值。",
+    "Voice 可用来理解四段串联流程，但不能作为实时全双工方案的技术基准。",
+    "后续横向比较时，要重点寻找 Waku 尚未覆盖的恢复、安全、知识治理与实时语音能力。"
+  ],
+  "features": [
+    {
+      "id": "agent-loop",
+      "name": "Agent Loop",
+      "provides": "接收用户消息，让模型迭代调用工具，并在得到最终文本或达到预算时结束。",
+      "trigger": "Waku.respond 或 Gateway 收到一条用户消息",
+      "owner": "Waku._run_full_turn 与 run_loop",
+      "output": "LoopResult：最终回复、迭代次数与工具事件",
+      "consumer": "CLI、Dashboard、Gateway 与 tracing",
+      "mechanism": "应用层先准备历史、记忆和工具注册表，再把统一模型客户端、消息和工具 schema 交给 run_loop；循环解析模型返回的 tool_use，执行工具后把结果追加回消息，直到文本完成或达到最大迭代。",
+      "technologies": ["Python", "Anthropic/OpenAI wire adapters", "explicit iteration budget", "tool schema"],
+      "reuse": "显式循环状态、工具错误回填、停止预算与 LoopResult 合同。",
+      "adapt": "把模型协议、token/成本预算和取消信号抽成自己的运行时接口。",
+      "avoid": "不要把同步循环直接当成多 Agent 调度器或长时间任务恢复机制。",
+      "unknown": "并发工具、进程恢复和长任务持久化需要独立压测。",
+      "sources": [
+        {"path":"waku/loop/agent.py","symbol":"run_loop","line_start":35,"line_end":114,"reason":"核心模型/工具迭代与终止条件。"},
+        {"path":"waku/app.py","symbol":"Waku._run_full_turn","line_start":114,"line_end":137,"reason":"应用层如何组装记忆、工具、模型与观察器。"}
+      ]
+    },
+    {
+      "id": "memory",
+      "name": "Long-term Memory",
+      "provides": "保存会话、检索相关事实和技能，并在满足条件时整理长期记忆。",
+      "trigger": "每次响应前检索、响应后写入，或达到 consolidation 条件",
+      "owner": "Memory 与 consolidation 模块",
+      "output": "检索上下文、聊天记录、事实/episode 与导出的 Markdown",
+      "consumer": "Agent Loop、Dashboard 和后续会话",
+      "mechanism": "Memory 把事实库、episode store、技能检索、会话日志和 consolidation 组合在一个门面里；检索门先判断是否需要召回，再把结果注入提示上下文；整理任务按时间/阈值压缩旧记录。",
+      "technologies": ["SQLite", "retrieval gate", "fact/episode stores", "Markdown export"],
+      "reuse": "检索门、事实与 episode 分层、写后整理以及本地导出。",
+      "adapt": "根据你的知识本体替换 store，并给每条记忆增加来源与保留策略。",
+      "avoid": "不要把 LLM consolidation 结果直接当成不可变事实。",
+      "unknown": "大规模记忆下的召回质量、冲突合并和删除合规需验证。",
+      "sources": [
+        {"path":"waku/memory/__init__.py","symbol":"Memory","line_start":45,"line_end":202,"reason":"长期记忆门面、检索、日志、导出与整理触发。"},
+        {"path":"waku/memory/consolidation.py","symbol":"consolidate_if_due","line_start":37,"line_end":82,"reason":"周期整理的触发和写回路径。"}
+      ]
+    },
+    {
+      "id": "graph-workflow",
+      "name": "Graph Workflow",
+      "provides": "把一个任务拆成显式节点、依赖边、并行波次和条件路由。",
+      "trigger": "Waku 开启 graph 模式或 Dashboard 启动一个图工作流",
+      "owner": "Graph、Node 与 run_graph",
+      "output": "合并后的 state、节点事件、路由与失败状态",
+      "consumer": "Agent 应用、Dashboard 流式视图和 observer",
+      "mechanism": "Graph 保存节点、普通边和 router；run_graph 计算可执行波次，并发运行同一波节点，再按 reducer 规则合并 state；路由节点可以选择下一目标，碰撞时显式报错。",
+      "technologies": ["DAG", "ThreadPoolExecutor", "wave scheduling", "state reducers", "conditional routing"],
+      "reuse": "节点/边/router 分离、波次并行、状态碰撞检测与 observer 事件。",
+      "adapt": "增加持久 checkpoint、幂等键、取消传播和跨进程 worker。",
+      "avoid": "不要把内存 Graph 直接当作长时间、分布式或可恢复编排器。",
+      "unknown": "循环图、进程崩溃恢复和超大 state 的性能需要验证。",
+      "sources": [
+        {"path":"waku/graph/engine.py","symbol":"Graph / run_graph","line_start":54,"line_end":188,"reason":"图结构、波次调度、路由与状态合并核心。"},
+        {"path":"waku/graph/nodes.py","symbol":"tool_node / llm_node / agent_node","line_start":18,"line_end":78,"reason":"工具、LLM 和 Agent 节点适配器。"}
+      ]
+    },
+    {
+      "id": "gateway",
+      "name": "Multi-channel Gateway",
+      "provides": "让 Telegram、Discord、WhatsApp 等通道复用同一个本地 Agent 会话与错误边界。",
+      "trigger": "外部通道收到消息或 Gateway supervisor 启动连接",
+      "owner": "通道 adapter、GatewayAgentRunner 与 supervisor",
+      "output": "通道可发送的文本响应、状态和安全错误信息",
+      "consumer": "Telegram/Discord/WhatsApp 客户端与运维状态页",
+      "mechanism": "每个通道只负责平台收发；GatewayAgentRunner 串行化同一 session 的响应、在线程中调用同步 Agent，并记录可展示的错误；supervisor 管理通道生命周期与重载。",
+      "technologies": ["asyncio", "channel adapters", "session isolation", "supervisor"],
+      "reuse": "通道 adapter 与 Agent runner 分离、session id、错误净化和生命周期管理。",
+      "adapt": "增加持久任务队列、幂等消息键、背压和通道权限模型。",
+      "avoid": "不要把宿主进程线程隔离当作安全沙箱。",
+      "unknown": "断线重连、重复投递、速率限制和高并发背压需压测。",
+      "sources": [
+        {"path":"waku/gateway/runner.py","symbol":"GatewayAgentRunner / run_gateway_turn","line_start":21,"line_end":127,"reason":"通道与 Agent 之间的会话、线程和错误边界。"},
+        {"path":"waku/gateway/supervisor.py","symbol":"GatewaySupervisor","line_start":1,"line_end":118,"reason":"多通道生命周期和重载；行范围覆盖主要控制面。"}
+      ]
+    },
+    {
+      "id": "voice",
+      "name": "Local Voice",
+      "provides": "从麦克风录音、本地转写、调用 Agent，再把文本回复通过系统语音读出。",
+      "trigger": "voice CLI 或唤醒词循环检测到语音",
+      "owner": "Ears、Mouth 与 wake_loop",
+      "output": "转写文本、Agent 回复和扬声器音频",
+      "consumer": "本地用户",
+      "mechanism": "sounddevice 收集音频，faster-whisper 在本地转写；wake loop 做阈值/静音切分并调用 Waku；Mouth 优先使用 macOS say，把回复清洗为可朗读文本。",
+      "technologies": ["sounddevice", "faster-whisper", "VAD-like energy threshold", "macOS say"],
+      "reuse": "本地隐私优先、录音/ASR/Agent/TTS 四段边界和唤醒词流程。",
+      "adapt": "若要实时访谈，应替换为流式 VAD、流式 ASR、可打断 TTS 和 duplex 状态机。",
+      "avoid": "不要把当前按段录音+系统 TTS 描述为端到端全双工模型。",
+      "unknown": "跨平台 TTS、回声消除、barge-in 和端到端延迟尚未证明。",
+      "sources": [
+        {"path":"waku/gateway/voice.py","symbol":"Ears / Mouth / wake_loop","line_start":32,"line_end":309,"reason":"录音、ASR、朗读、唤醒和静音切分完整链。"}
+      ]
+    },
+    {
+      "id": "tools-mcp",
+      "name": "Tools and MCP",
+      "provides": "统一注册本地工具，并把外部 MCP server 的工具桥接进同一个调用合同。",
+      "trigger": "Agent Loop 收到模型的 tool_use",
+      "owner": "ToolRegistry 或 MCPBridge",
+      "output": "工具 schema 与序列化后的执行结果/错误",
+      "consumer": "模型的下一轮推理和 tracing",
+      "mechanism": "ToolRegistry 维护名称到 handler/schema 的映射并集中执行；MCPBridge 读取 server 配置、建立 session、把远端工具转换成同一 Tool，再把调用转发回对应 server。",
+      "technologies": ["JSON Schema", "MCP", "tool registry", "async bridge"],
+      "reuse": "统一 Tool 合同、schema 生成、集中错误处理和 MCP 适配。",
+      "adapt": "增加每工具授权、超时、资源配额、审计和进程隔离。",
+      "avoid": "不要默认信任 MCP server 或把 registry 当作权限系统。",
+      "unknown": "恶意工具输出、长调用取消和 server 崩溃恢复需安全测试。",
+      "sources": [
+        {"path":"waku/tools/registry.py","symbol":"Tool / ToolRegistry","line_start":16,"line_end":58,"reason":"本地工具 schema、注册与执行合同。"},
+        {"path":"waku/tools/mcp_client.py","symbol":"MCPBridge","line_start":28,"line_end":99,"reason":"MCP server 连接、工具转换与调用转发。"}
+      ]
+    },
+    {
+      "id": "model-providers",
+      "name": "Model Providers",
+      "provides": "让同一 Agent Loop 在 Anthropic wire 与 OpenAI-compatible wire 的多个供应商之间切换。",
+      "trigger": "启动时读取 Settings，或用户在 Dashboard 切换 provider/model",
+      "owner": "Provider catalog、get_client 与 integrations.apply_provider",
+      "output": "统一 messages.create 形态的客户端和当前模型配置",
+      "consumer": "Agent Loop、judge、arena 和 Dashboard",
+      "mechanism": "Provider 表声明协议类型、key、base URL 和默认模型；get_client 处理不同 wire 与模型归属；integrations 保存配置、探测 provider 并触发 Agent 重载。",
+      "technologies": ["adapter pattern", "Anthropic SDK", "OpenAI-compatible APIs", "provider health probe"],
+      "reuse": "声明式 provider catalog、协议适配、模型归属校验和热切换边界。",
+      "adapt": "增加能力矩阵、结构化输出/工具兼容性探测、配额与成本策略。",
+      "avoid": "不要假设 OpenAI-compatible 就意味着工具、流式和错误语义完全一致。",
+      "unknown": "每个供应商的工具语义、限流和故障退避要逐一验证。",
+      "sources": [
+        {"path":"waku/loop/models.py","symbol":"Provider / PROVIDERS / get_client","line_start":29,"line_end":310,"reason":"供应商声明、模型归属和客户端构造核心。"},
+        {"path":"waku/integrations.py","symbol":"apply_provider","line_start":711,"line_end":828,"reason":"配置保存、探测、切换和禁用边界。"}
+      ]
+    },
+    {
+      "id": "dashboard-observability",
+      "name": "Dashboard and Observability",
+      "provides": "用本地网页查看聊天、Graph 事件、记忆、工具、session、trace 和设置。",
+      "trigger": "用户启动 dashboard 或运行中 observer 产生事件",
+      "owner": "Dashboard HTTP Handler 与 Tracer",
+      "output": "本地 API/静态页面、事件流、JSONL trace 与可选 OTEL span",
+      "consumer": "本地操作者、调试与评测工具",
+      "mechanism": "Dashboard 使用标准库 HTTP server 暴露本地 API 和静态资源；Tracer 把事件写入安全 JSONL，并可初始化 OpenTelemetry；observer fanout 把同一事件送往多个消费者。",
+      "technologies": ["BaseHTTPRequestHandler", "SSE-like event stream", "JSONL", "OpenTelemetry"],
+      "reuse": "本地只读/操作 API、observer 扇出、trace 编码门与可选 OTEL。",
+      "adapt": "增加鉴权、CSRF、防目录穿越、数据保留和多用户隔离。",
+      "avoid": "不要把 loopback 默认绑定当成完整 Web 安全模型。",
+      "unknown": "浏览器安全、长期 trace 体积和高频事件压力需验证。",
+      "sources": [
+        {"path":"waku/ops/dashboard.py","symbol":"Handler / main","line_start":883,"line_end":1135,"reason":"本地 HTTP 路由、静态资源与操作入口。"},
+        {"path":"waku/ops/tracing.py","symbol":"Tracer / compose","line_start":35,"line_end":167,"reason":"JSONL、OTEL 和 observer fanout。"}
+      ]
+    },
+    {
+      "id": "eval-release",
+      "name": "Evaluation and Release Gate",
+      "provides": "把确定性测试、模型 judge、工具调用评分和发布判断集中成可重复门禁。",
+      "trigger": "开发者运行 release gate、arena 或 CI",
+      "owner": "release_gate、scoring 和 eval suites",
+      "output": "退出码、suite 结果、评分与可打印报告",
+      "consumer": "开发者和 CI 发布流程",
+      "mechanism": "release_gate 用子进程执行确定性与 judge suites，汇总状态并给出非零退出；scoring 把用户消息匹配到期望工具调用并逐例判定；judge/arena 复用 provider 层比较模型。",
+      "technologies": ["pytest", "subprocess gate", "LLM judge", "deterministic tool-call scoring"],
+      "reuse": "确定性门与 judge 门分开、统一退出码、无 key 时显式跳过。",
+      "adapt": "增加固定数据集版本、置信区间、成本上限、flaky 管理与隔离环境。",
+      "avoid": "不要把单一 LLM judge 分数当作生产质量的唯一依据。",
+      "unknown": "judge 偏差、重复性和长期基准漂移需要统计验证。",
+      "sources": [
+        {"path":"waku/ops/release_gate.py","symbol":"run / report / main","line_start":27,"line_end":92,"reason":"测试 suite 编排、报告与退出门。"},
+        {"path":"waku/ops/scoring.py","symbol":"check_case / case_for_message","line_start":24,"line_end":59,"reason":"确定性工具调用评分。"}
+      ]
+    }
+  ]
+}

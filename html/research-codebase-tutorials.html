@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>代码仓库教学｜最终研究与社区结论</title>
+  <style>
+    :root{
+      --bg:#f4f1e9;--paper:#fffefa;--ink:#18201b;--muted:#667068;--line:#d9ddd7;
+      --green:#0b6b4c;--green-soft:#e2f2eb;--orange:#dc5d28;--orange-soft:#fff0e7;
+      --blue:#285ea8;--blue-soft:#eaf1fb;--red:#9b3c37;--shadow:0 24px 80px rgba(29,43,34,.08)
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth;background:var(--bg)}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.72 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif}
+    a{color:var(--green);text-underline-offset:3px}.shell{width:min(1200px,100%);min-height:100vh;margin:auto;background:var(--paper);box-shadow:var(--shadow)}
+    header{position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:13px 42px;border-bottom:1px solid var(--line);background:rgba(255,254,250,.94);backdrop-filter:blur(12px)}
+    .brand{color:var(--ink);font:850 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-decoration:none}
+    nav{display:flex;gap:20px;overflow:auto;white-space:nowrap}nav a{color:var(--muted);font-size:13px;font-weight:750;text-decoration:none}
+    main{padding:0 42px 80px}.hero{display:grid;grid-template-columns:1.35fr .65fr;gap:44px;padding:62px 0 46px;border-bottom:1px solid var(--line)}
+    .eyebrow{margin:0 0 20px;color:var(--green);font-size:12px;font-weight:850;letter-spacing:.15em;text-transform:uppercase}
+    h1,h2,h3{line-height:1.14;letter-spacing:-.035em}h1{max-width:790px;margin:0;font-size:clamp(2.7rem,5vw,4.65rem);font-weight:880}h1 span{display:block;white-space:nowrap}
+    .lede{max-width:760px;margin:22px 0 0;color:var(--muted);font-size:clamp(1.05rem,2vw,1.25rem)}
+    .hero-note{align-self:end;padding:25px;border:1px solid var(--line);border-radius:22px;background:var(--orange-soft)}.hero-note b{display:block;margin-bottom:9px;font-size:18px}.hero-note p{margin:0;color:var(--muted)}
+    section{padding:68px 0 0}.section-head{display:grid;grid-template-columns:.35fr 1fr;gap:38px;margin-bottom:28px}.kicker{color:var(--orange);font:850 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase}
+    h2{max-width:820px;margin:0;font-size:clamp(2rem,4vw,3.55rem)}h3{margin:0;font-size:1.35rem}.intro{max-width:820px;margin:0 0 28px;color:var(--muted);font-size:1.05rem}
+    .verdict{display:grid;grid-template-columns:1.18fr .82fr;gap:16px}.verdict article{padding:30px;border:1px solid var(--line);border-radius:22px}.verdict .main{background:var(--green-soft)}
+    .stamp{display:inline-flex;margin-bottom:22px;padding:5px 9px;border-radius:999px;background:var(--paper);color:var(--green);font-size:12px;font-weight:850}.verdict h3{font-size:1.8rem}.verdict p{margin:13px 0 0;color:var(--muted)}
+    .best-list{margin:19px 0 0;padding:0;list-style:none}.best-list li{display:grid;grid-template-columns:112px 1fr;gap:14px;padding:11px 0;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}.best-list strong{font-size:14px}.best-list span{color:var(--muted);font-size:14px}
+    .modes{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.mode{min-height:230px;padding:24px;border:1px solid var(--line);border-radius:20px}.mode b{display:block;margin-bottom:28px;color:var(--green);font:850 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.mode h3{margin-bottom:9px}.mode p{margin:0;color:var(--muted);font-size:14px}.mode em{display:block;margin-top:20px;color:var(--ink);font-size:13px;font-style:normal;font-weight:750}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:20px}table{width:100%;min-width:980px;border-collapse:collapse}th,td{padding:17px 16px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f2f4ef;color:var(--muted);font-size:12px;letter-spacing:.04em}td{font-size:14px}tbody tr:last-child td{border-bottom:0}.project-name strong{display:block;font-size:16px}.project-name small{color:var(--muted)}
+    .tag{display:inline-flex;padding:4px 8px;border-radius:999px;background:var(--green-soft);color:var(--green);font-size:11px;font-weight:850}.tag.warn{background:var(--orange-soft);color:var(--orange)}.tag.blue{background:var(--blue-soft);color:var(--blue)}
+    .projects{display:grid;gap:16px}.project{display:grid;grid-template-columns:.29fr .71fr;border:1px solid var(--line);border-radius:22px;overflow:hidden}.project-side{padding:26px;background:#f5f6f1}.project-side .rank{display:block;margin-bottom:42px;color:var(--orange);font:850 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.project-side p{margin:12px 0 0;color:var(--muted);font-size:13px}.project-body{padding:26px}.answer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}.answer{padding:16px;border-left:3px solid var(--line);color:var(--muted);font-size:13px}.answer b{display:block;margin-bottom:5px;color:var(--ink)}
+    .path{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:20px 0}.path span{padding:8px 11px;border-radius:10px;background:var(--blue-soft);color:var(--blue);font-size:12px;font-weight:750}.path i{color:var(--muted);font-style:normal}.source-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px;font-size:13px}
+    .lowstar{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.audit{padding:24px;border:1px solid var(--line);border-radius:20px}.audit b{display:block;margin-bottom:8px}.audit .score{font-size:2rem;font-weight:880;color:var(--green)}.audit p{margin:10px 0;color:var(--muted);font-size:14px}.audit ul{margin:14px 0 0;padding-left:19px;font-size:13px}
+    .community{display:grid;grid-template-columns:.8fr 1.2fr;gap:16px}.community article{padding:27px;border:1px solid var(--line);border-radius:22px}.community article:first-child{background:var(--orange-soft)}.community ul{margin:18px 0 0;padding-left:20px}.community li{margin:8px 0}.quote{margin:12px 0 0;padding:14px 0;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+    .rules{display:grid;grid-template-columns:repeat(5,1fr);gap:0}.rule{padding:22px 16px;border-block:1px solid var(--line);border-right:1px solid var(--line)}.rule:first-child{border-left:1px solid var(--line);border-radius:16px 0 0 16px}.rule:last-child{border-radius:0 16px 16px 0;background:var(--green-soft)}.rule b{display:block;margin-bottom:20px;color:var(--orange);font:850 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.rule strong{display:block;margin-bottom:8px}.rule p{margin:0;color:var(--muted);font-size:12px;line-height:1.55}
+    details{margin-top:20px;padding:18px 20px;border:1px solid var(--line);border-radius:14px}summary{cursor:pointer;font-weight:800}.fine{color:var(--muted);font-size:13px}footer{margin-top:72px;padding-top:25px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+    @media(max-width:900px){header{padding:12px 20px}main{padding:0 20px 55px}.hero,.section-head,.verdict,.project,.community{grid-template-columns:1fr}.modes{grid-template-columns:1fr 1fr}.answer-grid,.lowstar{grid-template-columns:1fr}.rules{grid-template-columns:1fr}.rule,.rule:first-child,.rule:last-child{border:1px solid var(--line);border-bottom:0;border-radius:0}.rule:first-child{border-radius:16px 16px 0 0}.rule:last-child{border-bottom:1px solid var(--line);border-radius:0 0 16px 16px}.project-side .rank{margin-bottom:20px}}
+    @media(max-width:580px){header nav{display:none}h1{font-size:2.7rem}.modes{grid-template-columns:1fr}.mode{min-height:0}.best-list li{grid-template-columns:1fr}.hero{padding-top:52px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <a class="brand" href="../source-notes-code-repository-teaching.md">RESEARCH / REPO TUTORIALS</a>
+    <nav aria-label="本页目录"><a href="#answer">结论</a><a href="#types">类型</a><a href="#matrix">对比</a><a href="#projects">项目</a><a href="#community">社区</a><a href="#implementation">实现</a></nav>
+  </header>
+  <main>
+    <section class="hero" id="answer">
+      <div>
+        <p class="eyebrow">最终研究 · GitHub + X + 源码与 issue · 2026-08-10</p>
+        <h1><span>别人怎样把陌生</span><span>代码仓库讲明白？</span></h1>
+        <p class="lede">先研究现成教程、Wiki、代码图和交互式导览分别做对了什么。这里不设计你的数据库、服务或完整技术模块，只回答参考谁、参考哪一段、哪里不能照搬。</p>
+      </div>
+      <aside class="hero-note"><b>这次纠正了一个误区</b><p>“自动生成很多页面”不等于“教会人理解项目”。教程必须有学习顺序、真实源码证据和读完后的动作；Wiki 只解决知识覆盖。</p></aside>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="kicker">30 秒结论</span><h2>没有一个项目可以直接当完整基准。</h2></div>
+      <div class="verdict">
+        <article class="main"><span class="stamp">当前最佳组合</span><h3>最像“仓库教学”的不是一个产品，而是六块能力。</h3>
+          <ul class="best-list">
+            <li><strong>SourceBridge</strong><span>最完整的源码证据、分层理解和多种教学产物；低星但工程质量意外地高。</span></li>
+            <li><strong>PocketFlow</strong><span>最清楚的章节教程生成链；适合学习叙事，不够适合严谨源码审计。</span></li>
+            <li><strong>OpenWiki</strong><span>最值得借的覆盖检查、批判 Agent、问答验收和增量更新方法。</span></li>
+            <li><strong>Understand Anything</strong><span>把文件、符号、调用和学习路线放进可探索代码图。</span></li>
+            <li><strong>CodeTour / Walkthrough</strong><span>把讲解落到 IDE 里的文件、行号、提交与追问。</span></li>
+            <li><strong>learn-codebase</strong><span>用苏格拉底追问、预测和主动回忆让用户真正学会，而不是被动阅读。</span></li>
+          </ul>
+        </article>
+        <article><span class="stamp">排序原则</span><h3>Star 只代表发现概率，不代表可复用质量。</h3><p>本次排序同时看：实际生成链、源码锚点、测试与 CI、错误处理、增量更新、许可证、公开 issue 和社区反馈。`SourceBridge` 14 stars、`Walkthrough` 10 stars，却都提供了高价值实现证据。</p></article>
+      </div>
+    </section>
+
+    <section id="types">
+      <div class="section-head"><span class="kicker">先分清目标</span><h2>“讲解代码仓库”其实是四种不同任务。</h2></div>
+      <div class="modes">
+        <article class="mode"><b>01 / 查资料</b><h3>自动 Wiki</h3><p>目标是覆盖项目结构、模块和概念，方便搜索与问答。</p><em>参考：OpenWiki、DeepWiki-Open、RepoAgent</em></article>
+        <article class="mode"><b>02 / 从头学</b><h3>章节教程</h3><p>先选核心抽象，再排前置顺序，用例、类比、源码与总结逐章推进。</p><em>参考：PocketFlow、SourceBridge Learning Path</em></article>
+        <article class="mode"><b>03 / 跟着代码走</b><h3>Code Tour</h3><p>在编辑器里按真实文件和行号走完一个功能或工作流。</p><em>参考：CodeTour、Walkthrough、SourceBridge Code Tour</em></article>
+        <article class="mode"><b>04 / 确认学会</b><h3>交互式学习</h3><p>先让用户预测、回答、追踪控制流，再逐级给提示并复习。</p><em>参考：learn-codebase、OpenWiki QA</em></article>
+      </div>
+    </section>
+
+    <section id="matrix">
+      <div class="section-head"><span class="kicker">横向比较</span><h2>每个项目真正擅长的只有一两件事。</h2></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>项目</th><th>最终产物</th><th>它怎样实现</th><th>最值得参考</th><th>主要问题</th><th>结论</th></tr></thead>
+        <tbody>
+          <tr><td class="project-name"><strong>SourceBridge</strong><small>14★ · AGPL-3.0</small></td><td>Cliff Notes、Learning Path、Code Tour、Workflow Story</td><td>符号图 + 四层自底向上摘要 + 证据门 + 缓存/断点</td><td>完整教学产物链与可靠性工程</td><td>AGPL；平台很大；社区验证少</td><td><span class="tag">核心参考</span></td></tr>
+          <tr><td class="project-name"><strong>PocketFlow Tutorial</strong><small>12,612★ · MIT</small></td><td>按章节排列的可读教程</td><td>抽象识别 → 关系 → 章节排序 → 并行写作 → 合并</td><td>总—分—总叙事和章节顺序</td><td>类比过多；版本锚点弱；大仓库/超长上下文问题</td><td><span class="tag">核心参考</span></td></tr>
+          <tr><td class="project-name"><strong>OpenWiki</strong><small>14,776★ · MIT</small></td><td>持续维护的 Agent 文档</td><td>骨架生成 → critic 查漏 → 未知项扫描 → QA 验收 → 增量更新</td><td>覆盖、证据、质量门和漂移更新</td><td>初始化/工具失败的公开 issue 仍多</td><td><span class="tag">核心参考</span></td></tr>
+          <tr><td class="project-name"><strong>Understand Anything</strong><small>78,456★ · MIT</small></td><td>代码知识图、Dashboard、Tour</td><td>文件/函数/类节点 + import/call/contain 边 + 拓扑路线</td><td>图模型和可探索学习路线</td><td>跨批次连边、路径和自更新仍有 issue</td><td><span class="tag blue">图层参考</span></td></tr>
+          <tr><td class="project-name"><strong>CodeBoarding</strong><small>2,377★ · MIT</small></td><td>架构图、文档、增量更新</td><td>静态分析/LSP 先取结构，LLM 再聚类并写说明</td><td>静态证据和架构聚类</td><td>生成文档仍可能泛化、漏分组或产生坏链接</td><td><span class="tag blue">专项参考</span></td></tr>
+          <tr><td class="project-name"><strong>CodeTour + Walkthrough</strong><small>4,556★ / 10★ · MIT</small></td><td>IDE 内逐步导览与追问</td><td>文件/行/模式锚点、提交 ref、实时 MCP 步骤与 tangent</td><td>交互呈现和源码定位</td><td>本身不决定讲哪些核心功能</td><td><span class="tag blue">交互参考</span></td></tr>
+          <tr><td class="project-name"><strong>learn-codebase</strong><small>39★ · MIT</small></td><td>苏格拉底式 Agent Skill</td><td>预测 → 追踪 → 分级提示 → 主动回忆 → 学习日志</td><td>教学对话与防止被动阅读</td><td>只有 Prompt/文档；无索引引擎和测试</td><td><span class="tag warn">教学模式</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="fine">Star 与许可为 2026-08-10 GitHub API 快照；它们不参与代码质量打分。</p>
+    </section>
+
+    <section id="projects">
+      <div class="section-head"><span class="kicker">源码拆解</span><h2>值得读的不是 README，而是实际生成链。</h2></div>
+      <div class="projects">
+        <article class="project">
+          <aside class="project-side"><span class="rank">01 / 完整度最高</span><h3>SourceBridge</h3><p>低 star 项目中最值得重点 review 的一个。</p></aside>
+          <div class="project-body"><span class="tag">参考为主，不直接复制</span>
+            <div class="path"><span>代码快照</span><i>→</i><span>符号 / 关系图</span><i>→</i><span>分段摘要</span><i>→</i><span>文件 / 包 / 根摘要</span><i>→</i><span>多种教学产物</span></div>
+            <div class="answer-grid"><div class="answer"><b>它提供什么</b>Cliff Notes、学习路径、代码游览、工作流故事、架构图和 MCP。</div><div class="answer"><b>怎么实现</b>四层自底向上理解树，小模型调用可并行；内容哈希缓存和 checkpoint 支持恢复。</div><div class="answer"><b>为什么值得看</b>Code Tour 会校验文件路径、处理幻觉路径、标记证据不足并记录置信度；CI 跨 Go/Python/Web。</div></div>
+            <div class="source-row"><a href="https://github.com/sourcebridge-ai/sourcebridge">仓库</a><a href="https://github.com/sourcebridge-ai/sourcebridge/blob/main/workers/comprehension/hierarchical.py">分层理解</a><a href="https://github.com/sourcebridge-ai/sourcebridge/blob/main/workers/knowledge/code_tour.py">Code Tour</a><a href="https://github.com/sourcebridge-ai/sourcebridge/blob/main/.github/workflows/ci.yml">CI</a></div>
+          </div>
+        </article>
+
+        <article class="project">
+          <aside class="project-side"><span class="rank">02 / 最像教程</span><h3>PocketFlow Tutorial</h3><p>最容易看懂的最小生成流水线。</p></aside>
+          <div class="project-body"><span class="tag">叙事基准</span>
+            <div class="path"><span>取仓库</span><i>→</i><span>识别核心抽象</span><i>→</i><span>分析关系</span><i>→</i><span>排序章节</span><i>→</i><span>写作 / 合并</span></div>
+            <div class="answer-grid"><div class="answer"><b>它提供什么</b>从总览进入核心概念，章节之间有前置关系和下一章桥接。</div><div class="answer"><b>怎么实现</b>`flow.py` 串六个节点，`nodes.py` 分别为抽象、关系、排序和章节写作设计 Prompt。</div><div class="answer"><b>不能照搬</b>示例常标注“高度简化”；公开 issue 明确要求 commit/version 锚点，也暴露大仓库 token 问题。</div></div>
+            <div class="source-row"><a href="https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge">仓库</a><a href="https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge/blob/main/flow.py">生成 Flow</a><a href="https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge/blob/main/nodes.py">节点实现</a><a href="https://news.ycombinator.com/item?id=43739456">HN 讨论</a><a href="https://github.com/The-Pocket/PocketFlow-Tutorial-Codebase-Knowledge/issues/57">版本锚点 issue</a></div>
+          </div>
+        </article>
+
+        <article class="project">
+          <aside class="project-side"><span class="rank">03 / 可信度守门</span><h3>OpenWiki</h3><p>它最重要的不是“写 Wiki”，而是如何发现自己漏了什么。</p></aside>
+          <div class="project-body"><span class="tag">质量流程基准</span>
+            <div class="path"><span>生成骨架</span><i>→</i><span>Critic 查漏</span><i>→</i><span>Unknown-unknown</span><i>→</i><span>源码写页</span><i>→</i><span>Wiki-only QA</span></div>
+            <div class="answer-grid"><div class="answer"><b>它提供什么</b>面向 Agent 的项目知识页，可从 Git 历史持续更新。</div><div class="answer"><b>怎么实现</b>按运行重要性、依赖中心性、变化历史、公开接口和测试排序；独立 subagent 做覆盖审查和问答验收。</div><div class="answer"><b>最该借什么</b>页面同时保存 source paths、symbols、test paths、invariants、validation commands；这比“看起来像文档”更可信。</div></div>
+            <div class="source-row"><a href="https://github.com/langchain-ai/openwiki">仓库</a><a href="https://github.com/langchain-ai/openwiki/tree/main/src/agent">Agent 实现</a><a href="https://github.com/langchain-ai/openwiki/issues/458">截断写入风险</a><a href="https://github.com/langchain-ai/openwiki/issues/489">非幂等初始化</a></div>
+          </div>
+        </article>
+
+        <article class="project">
+          <aside class="project-side"><span class="rank">04 / 图与路线</span><h3>Understand Anything</h3><p>“可探索的图”比静态目录更适合回答关系问题。</p></aside>
+          <div class="project-body"><span class="tag blue">图层参考</span>
+            <div class="path"><span>解析文件 / 符号</span><i>→</i><span>建立 contains/imports/calls</span><i>→</i><span>分层</span><i>→</i><span>生成 Tour</span><i>→</i><span>提交后增量更新</span></div>
+            <div class="answer-grid"><div class="answer"><b>它提供什么</b>代码知识图、搜索问答、层级视图和学习路线。</div><div class="answer"><b>怎么实现</b>图生成器建立节点与边，Tour Generator 使用图层和边让 LLM 排路线，失败时用拓扑排序回退。</div><div class="answer"><b>主要风险</b>公开 issue 仍在处理 import/path、跨批次边和自更新循环；图形丰富不自动等于语义正确。</div></div>
+            <div class="source-row"><a href="https://github.com/Egonex-AI/Understand-Anything">仓库</a><a href="https://github.com/Egonex-AI/Understand-Anything/discussions/125">代码图与长期 Wiki 的边界</a><a href="https://github.com/Egonex-AI/Understand-Anything/issues/76">首次运行成本</a></div>
+          </div>
+        </article>
+
+        <article class="project">
+          <aside class="project-side"><span class="rank">05 / IDE 教学</span><h3>CodeTour + Walkthrough</h3><p>CodeTour 负责可保存的路线，Walkthrough 负责 Agent 实时带路。</p></aside>
+          <div class="project-body"><span class="tag blue">交互层参考</span>
+            <div class="path"><span>选择角色 / 任务</span><i>→</i><span>文件与行号步骤</span><i>→</i><span>提交 ref</span><i>→</i><span>编辑器逐步播放</span><i>→</i><span>追问 / tangent</span></div>
+            <div class="answer-grid"><div class="answer"><b>CodeTour</b>成熟 `.tour` 格式、行/模式锚点、导出和 CI 漂移检测。</div><div class="answer"><b>Walkthrough</b>MCP 工具实时显示步骤、等待用户问题、插入 3.1/3.1.1 子路线，并支持 commit-backed diff tour。</div><div class="answer"><b>边界</b>它们解决“如何跟着读”，不负责发现仓库最值得学的功能，也不验证所有讲解语义。</div></div>
+            <div class="source-row"><a href="https://github.com/microsoft/codetour">CodeTour</a><a href="https://github.com/github/awesome-copilot/blob/main/skills/code-tour/SKILL.md">GitHub Code Tour Skill</a><a href="https://github.com/forketyfork/walkthrough-plugin">Walkthrough</a><a href="https://www.reddit.com/r/Jetbrains/comments/1t78ocb/walkthrough_an_intellij_plugin_that_lets_any_ai/">社区讨论</a></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="kicker">低 star 审计</span><h2>少人关注，不等于代码不值得看。</h2></div>
+      <div class="lowstar">
+        <article class="audit"><span class="score">14★</span><b>SourceBridge</b><p>本次最大的意外发现。</p><ul><li>跨 Go/Python/Web 的 lint、test、build</li><li>依赖 action 固定 SHA</li><li>Code Tour 幻觉路径过滤与证据门</li><li>风险：AGPL 与复杂度</li></ul></article>
+        <article class="audit"><span class="score">10★</span><b>Walkthrough</b><p>小而清楚的 IDE/MCP 交互参考。</p><ul><li>Qodana、构建、发布 CI</li><li>测试覆盖路线历史、追问和 tangent</li><li>commit-backed diff tour</li><li>风险：不是分析引擎</li></ul></article>
+        <article class="audit"><span class="score">17★</span><b>Tour de Code AI</b><p>可看 UI，不宜做核心基准。</p><ul><li>Repomix 分批 → LLM → `.tour`</li><li>只校验文件存在</li><li>实现与注释存在漂移</li><li>缺少测试，仅 release workflow</li></ul></article>
+      </div>
+    </section>
+
+    <section id="community">
+      <div class="section-head"><span class="kicker">X / GitHub / HN</span><h2>社区最有价值的是批评，不是转发量。</h2></div>
+      <div class="community">
+        <article><h3>X 适合发现方向</h3><p>X 上的内容主要是发布、演示和“这个项目很酷”，很少给准确率证据。它帮助发现 Understand Anything、OpenWiki、PocketFlow 和 Code Tour 论文，但不能替代源码与 issue。</p>
+          <div class="quote"><a href="https://x.com/spanichella/status/1781707729435816032">Towards LLM-Generated Code Tours for Onboarding</a></div>
+          <div class="quote"><a href="https://x.com/daniel_mac8/status/2068384508077105538">Understand Anything 社区传播</a></div>
+          <div class="quote"><a href="https://x.com/allenzhou101/status/2072485686956154964">OpenWiki 发布</a></div>
+        </article>
+        <article><h3>真正影响设计判断的反馈</h3><ul>
+          <li><b>不要把解释写成“给小白的比喻合集”。</b> PocketFlow 的 HN 讨论反复批评餐厅类比、感叹号和过度简化；专业用户更想先看用例、测试和真实路径。</li>
+          <li><b>在私有或未知仓库上评测。</b> 热门开源仓库可能已经进入模型训练；公开样例表现好不能证明泛化。</li>
+          <li><b>LLM 可以局部说对、整体结论仍错。</b> 因而源码链接、测试与独立 QA 不是附属功能。</li>
+          <li><b>教程不是理论说明书。</b> Diátaxis 强调教程应让读者一步步做出结果；如果只有概念解释，它更像 Explanation。</li>
+          <li><b>文档会漂移。</b> commit 身份、增量更新和锚点校验必须在生成之初考虑。</li>
+        </ul></article>
+      </div>
+    </section>
+
+    <section id="implementation">
+      <div class="section-head"><span class="kicker">最终如何实现</span><h2>先做可信的报告闭环，再把选中功能交给 Agent。</h2></div>
+      <p class="intro">实现建议已经单独固化为可交接的 Markdown。它只决定顺序、范围、参考项目和验收门，不提前设计数据库、服务和类。</p>
+      <div class="modes">
+        <article class="mode"><b>PHASE 0</b><h3>先做评测样本</h3><p>准备熟悉仓库和低知名度仓库，由人标注核心功能、入口、符号和测试。</p><em>防止热门项目训练数据污染</em></article>
+        <article class="mode"><b>PHASE 1</b><h3>报告闭环</h3><p>固定 commit，建立确定性索引，生成能力地图、黄金路径和证据可追的 HTML。</p><em>先证明能讲对、讲清</em></article>
+        <article class="mode"><b>PHASE 2</b><h3>功能工作包</h3><p>选择功能后导出任务 Skill、模块索引、证据和可选 Code Tour，并检测漂移。</p><em>从阅读工具变成开发上下文</em></article>
+        <article class="mode"><b>PHASE 3</b><h3>互动与维护</h3><p>增加 IDE 追问、苏格拉底学习、Git diff 更新，以及向 Spec 和 Ticket 的连接。</p><em>最后再进入持续协作</em></article>
+      </div>
+      <details open><summary>打开最终实现建议</summary><p><a href="../FINAL-IMPLEMENTATION-GUIDE.md">FINAL-IMPLEMENTATION-GUIDE.md</a> 包含完整的 MVP 边界、端到端流程、开源参考映射、三期范围、质量门和完成标准。</p></details>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="kicker">研究归纳</span><h2>别人反复验证过的五条教学原则。</h2></div>
+      <div class="rules">
+        <article class="rule"><b>01</b><strong>从任务开始</strong><p>先说读者要理解或完成什么，不从完整目录开始。</p></article>
+        <article class="rule"><b>02</b><strong>只给小地图</strong><p>先选 5–7 个关键概念，再允许逐层展开。</p></article>
+        <article class="rule"><b>03</b><strong>走一条真实路径</strong><p>入口、状态、外部依赖、结果和异常要连成主线。</p></article>
+        <article class="rule"><b>04</b><strong>解释与证据交替</strong><p>类比回答为什么，文件/符号/测试回答凭什么。</p></article>
+        <article class="rule"><b>05</b><strong>结尾让人行动</strong><p>做一个改动、回答一道问题，或选择下一条 Tour。</p></article>
+      </div>
+      <details><summary>这次研究后，参考优先级发生了什么变化？</summary><p><b>上调：</b>SourceBridge、PocketFlow、OpenWiki、Walkthrough。<b>降级为局部参考：</b>DeepWiki-Open、CodeBoarding、Tour de Code AI。<b>仍是底层工具而不是教学产品：</b>Sourcegraph/GitHub 符号导航、SCIP、tree-sitter、Repomix。</p></details>
+      <details><summary>哪些结论还没有验证？</summary><p>尚未让所有项目对同一个私有大型仓库生成结果，因此不比较准确率、成本和延迟；没有把营销中的 grounded 当成逐条事实正确；也没有用 star 作为质量代理。下一阶段如继续，应先 clone shortlist，再做同仓库对照测试。</p></details>
+    </section>
+
+    <footer>完整源码与社区证据见 <a href="../source-notes-code-repository-teaching.md">source-notes-code-repository-teaching.md</a>；最终实现建议见 <a href="../FINAL-IMPLEMENTATION-GUIDE.md">FINAL-IMPLEMENTATION-GUIDE.md</a>。本页不是详细架构设计。</footer>
+  </main>
+</div>
+</body>
+</html>

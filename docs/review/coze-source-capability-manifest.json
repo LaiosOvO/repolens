@@ -1,0 +1,724 @@
+[
+  {
+    "id": "local_auth_session",
+    "title": "本地登录态与桌面会话启动",
+    "user_action": "用户在桌面端进入登录页，用邮箱建立本地登录态，然后前端按 electronAPI 与本地后端返回的 session 进入主界面。",
+    "mechanism_question": "登录态到底存在哪里、如何创建、是否真的连远程账号系统，前端又通过什么桥接拿到这个状态？",
+    "distinguish": "这不是远程 OAuth，也不是浏览器 cookie 登录；它是本地邮箱登录态写入本地后端，再由桌面 preload 暴露 IPC 能力给 renderer 使用。",
+    "source_refs": [
+      {
+        "path": "frontend/renderer/page-manifest.js",
+        "line_start": 22,
+        "line_end": 41,
+        "claim": "桌面存在独立的 /desktop-login 路由，说明登录是明确的用户入口页面。"
+      },
+      {
+        "path": "frontend/preload.cjs",
+        "line_start": 43,
+        "line_end": 51,
+        "claim": "preload 用 contextBridge.exposeInMainWorld 暴露 electronAPI，renderer 通过这层桥接访问桌面能力。"
+      },
+      {
+        "path": "backend/internal/httpapi/auth.go",
+        "line_start": 23,
+        "line_end": 41,
+        "claim": "本地后端提供 local session 读写入口，POST 会解析邮箱并调用 core.CreateLocalSession。"
+      },
+      {
+        "path": "backend/internal/service/auth.go",
+        "line_start": 20,
+        "line_end": 38,
+        "claim": "登录只生成本地 LocalSession，模式是 local-email，明确写了不保存密码或真实令牌。"
+      }
+    ],
+    "coverage_notes": "已覆盖前端登录路由、桌面桥接层、HTTP 登录入口、service 登录态生成逻辑。未单独展开 store 落盘函数，但 CreateLocalSession 已直接证明这是本地 session 语义。"
+  },
+  {
+    "id": "sessions_visibility",
+    "title": "会话列表、搜索与隐藏/归档可见性",
+    "user_action": "用户查看会话列表、按 scope 搜索，或把会话隐藏/归档，再在不同视图中重新看到它们。",
+    "mechanism_question": "会话列表如何按 active/all/hidden/archived 切分，搜索是只看内存还是走存储层筛选？",
+    "distinguish": "这不是单纯前端数组过滤；scope 校验、查询分页、隐藏归档状态都落在后端 store 查询与更新上。",
+    "source_refs": [
+      {
+        "path": "frontend/renderer/page-manifest.js",
+        "line_start": 66,
+        "line_end": 81,
+        "claim": "首页 / 路由就是主会话入口，且 needAuth 与 needAccountContext 为 true，说明会话区是登录后的核心界面。"
+      },
+      {
+        "path": "backend/internal/httpapi/sessions.go",
+        "line_start": 33,
+        "line_end": 51,
+        "claim": "会话集合接口支持 GET/POST，GET 会按 query scope 调 core.ListSessionsForScope，并对非法 scope 返回错误。"
+      },
+      {
+        "path": "backend/internal/store/session_visibility.go",
+        "line_start": 15,
+        "line_end": 23,
+        "claim": "store 层存在按 scope 列表读取能力，不是只在前端做假分页。"
+      },
+      {
+        "path": "backend/internal/store/session_visibility.go",
+        "line_start": 41,
+        "line_end": 58,
+        "claim": "搜索会按 scope 与 query 进入 store 层做过滤，说明会话搜索与可见性绑定。"
+      },
+      {
+        "path": "backend/internal/store/session_visibility.go",
+        "line_start": 79,
+        "line_end": 94,
+        "claim": "隐藏/归档状态通过 UPDATE sessions hidden/archived 持久化，而不是临时 UI 标记。"
+      }
+    ],
+    "coverage_notes": "已覆盖用户入口、HTTP 集合接口、按 scope 读取、按 scope 搜索、隐藏归档持久化。若后续出报告，可再补具体前端按钮调用链。"
+  },
+  {
+    "id": "session_conversations",
+    "title": "会话内 conversation 子记录管理",
+    "user_action": "用户在一个 session 下面创建、编辑、删除 conversation 记录，而不是只有一条无结构聊天流。",
+    "mechanism_question": "conversation 是普通 message 还是独立实体，增删改查是直接改消息还是独立表？",
+    "distinguish": "这里的 conversation 不是 message log 本身，而是 session 下独立命名/描述的子对象，并且有独立 CRUD 接口和表。 ",
+    "source_refs": [
+      {
+        "path": "backend/internal/httpapi/sessions.go",
+        "line_start": 225,
+        "line_end": 264,
+        "claim": "session-conversations 有独立 PATCH/DELETE 路由，说明它不是附着在 messages 上的无名结构。"
+      },
+      {
+        "path": "backend/internal/service/session_conversations.go",
+        "line_start": 19,
+        "line_end": 27,
+        "claim": "创建 conversation 时会生成独立 conversation-<timestamp> ID，并单独清洗 name/description。"
+      },
+      {
+        "path": "backend/internal/store/session_conversations.go",
+        "line_start": 16,
+        "line_end": 27,
+        "claim": "store 层直接列出 session_conversations，证明存在独立存储对象。"
+      },
+      {
+        "path": "backend/internal/store/session_conversations.go",
+        "line_start": 42,
+        "line_end": 56,
+        "claim": "创建 conversation 会写入独立记录，而不是往 messages 表追加一条系统消息。"
+      }
+    ],
+    "coverage_notes": "已覆盖 conversation 的独立接口、service 生成规则、store 级独立实体。没有继续展开 message 表，因为这项能力的关键是“conversation 不是 message”。"
+  },
+  {
+    "id": "project_runtime_sandbox_restore",
+    "title": "项目运行时、Sandbox 初始化与按提交恢复",
+    "user_action": "用户进入项目页，初始化本地 sandbox，读取 runtime 信息、成员与集成，并按 commit 恢复项目版本。",
+    "mechanism_question": "所谓 runtime 是什么对象，sandbox 是如何初始化/扩容的，按 commit 恢复是真恢复还是先给确认态？",
+    "distinguish": "它不是通用 IDE 代理；前端有一层 original project runtime adapter 把原始接口语义映射到本地后端，本地后端再维护 runtime/bootstrap/sandbox/restore 状态。",
+    "source_refs": [
+      {
+        "path": "frontend/project-runtime-adapter.cjs",
+        "line_start": 84,
+        "line_end": 92,
+        "claim": "前端存在 createOriginalProjectRuntimeAdapter，把一组原始 project/space/playground 接口路径重定向到本地后端。"
+      },
+      {
+        "path": "backend/internal/service/project_runtime.go",
+        "line_start": 22,
+        "line_end": 45,
+        "claim": "runtime bootstrap 会把 workspace、members、integrations、sandbox 组合成启动所需的完整运行时引导对象。"
+      },
+      {
+        "path": "backend/internal/service/project_runtime.go",
+        "line_start": 69,
+        "line_end": 85,
+        "claim": "初始化 sandbox 的逻辑会把 disconnected 状态提升为 connected，并返回 CPU/Memory 容量。"
+      },
+      {
+        "path": "backend/internal/service/project_runtime.go",
+        "line_start": 87,
+        "line_end": 91,
+        "claim": "sandbox 扩缩容不是抽象说明，而是把 cpuMilli/memoryMB 映射成 CPUCores/MemoryGB 更新到项目 sandbox。"
+      },
+      {
+        "path": "backend/internal/service/project_runtime.go",
+        "line_start": 93,
+        "line_end": 120,
+        "claim": "按 commit 恢复先返回 awaiting_confirm；只有 confirm 为真时才真的调用 store.RestoreProjectVersion。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_runtime_actions.go",
+        "line_start": 36,
+        "line_end": 55,
+        "claim": "runtime actions 既支持 GET 列表，也支持 POST 创建 preflight action，是运行时动作的统一入口。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_runtime_execution.go",
+        "line_start": 21,
+        "line_end": 39,
+        "claim": "真正执行 runtime 时必须先带 actionId，说明执行不是任意命令直跑，而是依附已允许的 action。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_runtime_materialize.go",
+        "line_start": 21,
+        "line_end": 34,
+        "claim": "runtime materialize 是独立 POST 步骤，说明运行前可能先要物化资源。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_runtime_policy.go",
+        "line_start": 24,
+        "line_end": 39,
+        "claim": "命令白名单单独通过 runtime policy 写入，而不是执行时直接自由输入。"
+      },
+      {
+        "path": "backend/internal/store/runtime_actions.go",
+        "line_start": 25,
+        "line_end": 43,
+        "claim": "runtime action 持久化时可以顺带 upsert sandbox 状态，说明动作记录与运行资源状态是联动落库的。"
+      }
+    ],
+    "coverage_notes": "已覆盖前端适配层、runtime bootstrap、sandbox 初始化/扩容、commit 恢复、actions/execution/materialize/policy 入口以及 store 持久化联动。"
+  },
+  {
+    "id": "deployment_history_and_sandbox_publish",
+    "title": "本地部署历史与 Sandbox Provider 发布",
+    "user_action": "用户创建部署、查看部署历史和日志，必要时取消或停止部署。",
+    "mechanism_question": "部署是不是直接上线外网，provider 能力怎么声明，执行时到底做了什么？",
+    "distinguish": "这不是云平台真实发布；当前实现默认走 sandbox provider，本地物化文件、构建隔离目录、探活，domainMode 非 none 直接拒绝。",
+    "source_refs": [
+      {
+        "path": "backend/internal/httpapi/deployments.go",
+        "line_start": 11,
+        "line_end": 29,
+        "claim": "部署接口显式暴露 provider capabilities 与 deploy_history/create 两类入口。"
+      },
+      {
+        "path": "backend/internal/service/deployments.go",
+        "line_start": 30,
+        "line_end": 48,
+        "claim": "创建部署时会强制补全 provider=sandbox、domainMode=none，并拒绝非 none 域名模式。"
+      },
+      {
+        "path": "backend/internal/service/deployments.go",
+        "line_start": 218,
+        "line_end": 236,
+        "claim": "部署对象、分页历史、日志读取都是 service 一级能力，不是一次性 fire-and-forget。"
+      },
+      {
+        "path": "backend/internal/deployment/sandbox.go",
+        "line_start": 92,
+        "line_end": 110,
+        "claim": "sandbox provider 发布会创建受控 workDir，并先 materializeFiles 到隔离构建目录。"
+      },
+      {
+        "path": "backend/internal/deployment/sandbox.go",
+        "line_start": 185,
+        "line_end": 215,
+        "claim": "provider 内建 HTTP readiness probe 和 stop 能力，说明部署状态推进依赖本地探活而不是只写假状态。"
+      },
+      {
+        "path": "backend/internal/store/deployments.go",
+        "line_start": 150,
+        "line_end": 190,
+        "claim": "部署日志是独立持久化表，部署过程不是只有最终 status。"
+      }
+    ],
+    "coverage_notes": "已覆盖 HTTP 入口、service 约束、provider 执行器、日志持久化。还没展开 runDeployment 的全部状态机，但已足以说明它不是“前端假部署”。"
+  },
+  {
+    "id": "agent_catalog",
+    "title": "Agent 目录与本地能力清单",
+    "user_action": "用户查看本地 agent 列表与单个 agent 元信息，作为后续任务分配的目标集合。",
+    "mechanism_question": "agent 列表是不是写死前端 JSON，还是后端有独立存储与 capabilities 字段？",
+    "distinguish": "这不是展示静态卡片；后端有专门的 agents 表读取能力，列表按 capabilities_json 反序列化返回。",
+    "source_refs": [
+      {
+        "path": "frontend/renderer/page-manifest.js",
+        "line_start": 84,
+        "line_end": 104,
+        "claim": "前端存在 /expert 等 agent 相关入口页，说明 agent/专家是一级产品对象。"
+      },
+      {
+        "path": "backend/internal/httpapi/agents.go",
+        "line_start": 20,
+        "line_end": 38,
+        "claim": "后端 /api/agents 支持列出 agent 集合，不是 renderer 自己拼装。"
+      },
+      {
+        "path": "backend/internal/service/core.go",
+        "line_start": 154,
+        "line_end": 160,
+        "claim": "Core 层直接暴露 ListAgents/GetAgent，agent 是基础域对象。"
+      },
+      {
+        "path": "backend/internal/store/agents.go",
+        "line_start": 13,
+        "line_end": 29,
+        "claim": "store 从 agents 表读取 id/name/type/status/description/capabilities_json/last_active/device，说明 agent 目录是有结构化持久化的。"
+      }
+    ],
+    "coverage_notes": "已覆盖前端入口、HTTP 读接口、core 域对象、store 持久化字段。"
+  },
+  {
+    "id": "expert_templates_and_task_bootstrap",
+    "title": "专家模板浏览与一键转任务",
+    "user_action": "用户浏览 expert template，选定一个模板后直接创建对应任务。",
+    "mechanism_question": "专家页只是展示模板，还是会把模板输入转成标准 task 请求？模板数据从哪里来？",
+    "distinguish": "它不是另一套独立执行引擎；expert 只是 task 的更高层启动入口，最终仍落到标准 /api/tasks 队列。",
+    "source_refs": [
+      {
+        "path": "frontend/renderer/page-manifest.js",
+        "line_start": 84,
+        "line_end": 104,
+        "claim": "存在 /expert 总览页，对专家模板有独立用户入口。"
+      },
+      {
+        "path": "frontend/expert-task-ipc.cjs",
+        "line_start": 17,
+        "line_end": 25,
+        "claim": "expert:create-task IPC 会把 expertId、agentId、sessionId、title、summary 映射成标准任务创建请求。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_experts.go",
+        "line_start": 17,
+        "line_end": 25,
+        "claim": "后端有专门 expert templates 只读接口，模板不是纯前端静态对象。"
+      },
+      {
+        "path": "backend/internal/service/bridge.go",
+        "line_start": 28,
+        "line_end": 34,
+        "claim": "Core 只是把 expert template 读接口映射到 store，说明模板本身与执行解耦。"
+      },
+      {
+        "path": "backend/internal/store/agents.go",
+        "line_start": 13,
+        "line_end": 29,
+        "claim": "专家/agent 数据与持久化 agent 目录共享同一类后端对象，而不是临时 UI 草稿。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_agent_tasks.go",
+        "line_start": 34,
+        "line_end": 40,
+        "claim": "专家任务最终进入通用 tasks POST 流程，而不是专家页私有执行器。"
+      }
+    ],
+    "coverage_notes": "已覆盖前端专家入口、IPC 转换、后端模板读取、最终导流到标准 task 创建。store 中 ListExpertTemplates/GetExpertTemplate 具体实现未再展开，但整体机制已闭环。"
+  },
+  {
+    "id": "agent_task_queue_worker",
+    "title": "Agent Task 队列、租约领取与后台 Worker 执行",
+    "user_action": "用户创建任务、查看任务事件、重试/取消任务，并由后台 worker 逐个领取和推进状态。",
+    "mechanism_question": "task 是同步执行还是异步队列；worker 如何避免抢同一个任务；取消/重试靠什么状态机？",
+    "distinguish": "这不是一次 HTTP 请求直接跑完；它是持久化任务 + 事件表 + worker claim lease + 轮询执行模型。",
+    "source_refs": [
+      {
+        "path": "frontend/expert-task-ipc.cjs",
+        "line_start": 17,
+        "line_end": 25,
+        "claim": "前端创建专家任务时直接走 /api/tasks，说明任务对象是可持久化的后端资源。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_agent_tasks.go",
+        "line_start": 22,
+        "line_end": 40,
+        "claim": "tasks 集合既可 GET 列表也可 POST 创建，后端承认它是完整资源集合。"
+      },
+      {
+        "path": "backend/internal/service/agent_tasks.go",
+        "line_start": 19,
+        "line_end": 37,
+        "claim": "CreateAgentTask 会校验 expertId/agentId/sessionId 是否真实存在，证明任务不是随便拼字符串。"
+      },
+      {
+        "path": "backend/internal/service/agent_task_worker.go",
+        "line_start": 72,
+        "line_end": 90,
+        "claim": "worker 是显式 for 循环轮询模型：claim 下一条 queued 任务，空队列就 idle 等待。"
+      },
+      {
+        "path": "backend/internal/store/agent_tasks.go",
+        "line_start": 128,
+        "line_end": 146,
+        "claim": "ClaimNextAgentTask 在数据库事务里从 queued 任务中取一条，并在 pgx 下用 FOR UPDATE SKIP LOCKED 防并发争抢。"
+      },
+      {
+        "path": "backend/internal/store/agent_tasks.go",
+        "line_start": 190,
+        "line_end": 212,
+        "claim": "任务租约可续约并且支持 RecoverExpiredAgentTaskLeases，说明 worker 崩溃恢复被显式设计过。"
+      },
+      {
+        "path": "backend/internal/store/agent_tasks_executor_test.go",
+        "line_start": 12,
+        "line_end": 12,
+        "claim": "存在专门测试验证 lease claim 与恢复是 durable 的。"
+      }
+    ],
+    "coverage_notes": "已覆盖任务入口、实体校验、worker 主循环、claim/lease/recovery。后续生成章节时应重点解释这是队列型执行，不是同步 RPC。"
+  },
+  {
+    "id": "automation_plans_jobs",
+    "title": "自动化 Plan / Job 队列与事件流",
+    "user_action": "用户查看 plan，基于 plan 创建 job，读取 job 事件，并对 job 执行动作。",
+    "mechanism_question": "automation 是真 scheduler 还是本地占位队列；job 状态如何流转并记录事件？",
+    "distinguish": "当前实现不是远程 scheduler/executor；它会创建本地 queued job，同时写 job.created 事件，并通过状态转换表推进。",
+    "source_refs": [
+      {
+        "path": "frontend/automation-capabilities-ipc.cjs",
+        "line_start": 3,
+        "line_end": 12,
+        "claim": "桌面端明确通过 automation:capabilities IPC 读取自动化能力，而不是把自动化当普通任务。"
+      },
+      {
+        "path": "backend/internal/httpapi/automation.go",
+        "line_start": 142,
+        "line_end": 159,
+        "claim": "后端支持 /api/plans/{id}/jobs 创建 job，是 plan 驱动 job 的资源模型。"
+      },
+      {
+        "path": "backend/internal/service/automation.go",
+        "line_start": 58,
+        "line_end": 76,
+        "claim": "CreateJob 会生成 queued job，并写入 job.created 事件，事件里明确说明不会调用远程 scheduler 或 executor。"
+      },
+      {
+        "path": "backend/internal/store/automation.go",
+        "line_start": 71,
+        "line_end": 98,
+        "claim": "CreateJobWithEvent 会把 job 和首个 event 一起落库，说明 job 状态与事件是绑定持久化的。"
+      },
+      {
+        "path": "backend/internal/store/automation.go",
+        "line_start": 99,
+        "line_end": 127,
+        "claim": "TransitionJob 通过 compare-and-swap 方式按 previousStatus 更新，避免并发下状态乱跳。"
+      }
+    ],
+    "coverage_notes": "已覆盖 IPC 能力入口、plan->job 创建、local queue 语义、事件持久化、状态转换约束。"
+  },
+  {
+    "id": "marketplace_catalog_installation",
+    "title": "技能商店目录、安装、订单与收藏",
+    "user_action": "用户浏览技能商店、读取商品详情、安装技能、查看订单、切换收藏。",
+    "mechanism_question": "技能目录从哪里来，安装免费和付费商品时行为有何不同，收藏和订单是否都落本地存储？",
+    "distinguish": "这不是前端静态 mock；前端 IPC 先读 catalog，再通过本地后端维护安装记录、订单和收藏状态。付费商品不会真支付，只记 pending_purchase。 ",
+    "source_refs": [
+      {
+        "path": "frontend/marketplace-ipc.cjs",
+        "line_start": 104,
+        "line_end": 118,
+        "claim": "前端通过 skills:list/get/add/orders/collection/collect-toggle 多个 IPC 通道读写商店状态。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_marketplace_read.go",
+        "line_start": 21,
+        "line_end": 32,
+        "claim": "后端有 marketplace summary 读接口，未导入 catalog 时会显式报 MARKETPLACE_NOT_IMPORTED。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_marketplace_read.go",
+        "line_start": 46,
+        "line_end": 58,
+        "claim": "商品列表会解析 filter 后走 core.ListMarketplaceProducts，说明前端查询条件进入后端筛选。"
+      },
+      {
+        "path": "backend/internal/service/marketplace.go",
+        "line_start": 38,
+        "line_end": 41,
+        "claim": "安装动作不是 UI 自己改状态，而是进入 core.InstallMarketplaceProduct。"
+      },
+      {
+        "path": "backend/internal/store/marketplace.go",
+        "line_start": 401,
+        "line_end": 416,
+        "claim": "store 安装逻辑区分免费与付费：免费直接 installed，付费变成 pending_purchase 且 message 明确不会连接真实支付。"
+      },
+      {
+        "path": "backend/internal/store/marketplace.go",
+        "line_start": 504,
+        "line_end": 540,
+        "claim": "订单与收藏都由 store 独立维护，不是页面临时状态。"
+      }
+    ],
+    "coverage_notes": "已覆盖前端 IPC、目录读取、后端筛选、安装分支、订单/收藏持久化。"
+  },
+  {
+    "id": "billing_upgrade_refund_intent",
+    "title": "订阅升级意向与退款申请",
+    "user_action": "用户查看当前订阅、发起升级意向、提交退款申请并读取退款记录。",
+    "mechanism_question": "升级是否真的扣费，退款是否真联通支付系统，还是只在本地记意向？",
+    "distinguish": "这不是在线支付闭环；当前只验证 plan 是否存在，并把升级/退款意向写本地 store。 ",
+    "source_refs": [
+      {
+        "path": "frontend/subscription-ipc.cjs",
+        "line_start": 9,
+        "line_end": 17,
+        "claim": "前端通过 subscription:get、subscription:upgrade、refund:submit 三个 IPC 通道直接操作本地 billing 能力。"
+      },
+      {
+        "path": "backend/internal/httpapi/billing.go",
+        "line_start": 29,
+        "line_end": 45,
+        "claim": "订阅动作接口当前只支持 upgrade，明确是本地升级意向记录而非任意支付动作。"
+      },
+      {
+        "path": "backend/internal/service/billing.go",
+        "line_start": 23,
+        "line_end": 39,
+        "claim": "升级前会校验 planId 是否存在并读取当前 subscription，然后构造本地 SubscriptionAction。"
+      },
+      {
+        "path": "backend/internal/store/billing.go",
+        "line_start": 76,
+        "line_end": 112,
+        "claim": "订阅动作与退款请求都有独立存储记录，不是 UI 提交后即丢弃。"
+      }
+    ],
+    "coverage_notes": "已覆盖 IPC、动作接口、service 校验、store 持久化。未看到真实支付网关连接，现阶段可明确定义为本地 billing intent。"
+  },
+  {
+    "id": "media_actions",
+    "title": "媒体资源读取与本地动作记录",
+    "user_action": "用户查看某个媒体资源，并对其执行下载/导出/其他本地动作。",
+    "mechanism_question": "媒体动作会不会真的触发外部上传下载，还是只记录动作意向？",
+    "distinguish": "当前实现强调 external_effect=false；动作结果是本地事件记录，不是远程媒体处理流水线。 ",
+    "source_refs": [
+      {
+        "path": "backend/internal/httpapi/media.go",
+        "line_start": 26,
+        "line_end": 37,
+        "claim": "媒体动作通过独立 API 接收 action，并统一进入 core.ApplyMediaAction。"
+      },
+      {
+        "path": "backend/internal/service/media.go",
+        "line_start": 31,
+        "line_end": 49,
+        "claim": "service 会校验 kind/mediaId/action，并生成带 external_effect=false 的 MediaAction 结果。"
+      },
+      {
+        "path": "backend/internal/store/media.go",
+        "line_start": 60,
+        "line_end": 66,
+        "claim": "媒体动作最终写入 media_action_events 表，是显式本地事件日志。"
+      }
+    ],
+    "coverage_notes": "已覆盖 API、service 结果生成、store 事件落盘。"
+  },
+  {
+    "id": "public_share_copy_tracking",
+    "title": "公开分享资源读取与复制意向追踪",
+    "user_action": "用户打开某个公开分享资源，并点击复制/转发类操作。",
+    "mechanism_question": "复制行为是否真的访问系统剪贴板或发布服务，后端如何证明只是本地追踪？",
+    "distinguish": "当前实现不是实际分享传播，只是本地记录 share copy event，消息中直接声明未访问系统剪贴板或发布服务。 ",
+    "source_refs": [
+      {
+        "path": "backend/internal/httpapi/public_share.go",
+        "line_start": 26,
+        "line_end": 32,
+        "claim": "分享复制有独立接口 echoShareCopy，不是前端按钮自增计数。"
+      },
+      {
+        "path": "backend/internal/service/public_share.go",
+        "line_start": 31,
+        "line_end": 49,
+        "claim": "RecordShareCopy 会先校验资源存在，再生成 status=recorded_local_only、externalEffect=false 的事件。"
+      },
+      {
+        "path": "backend/internal/store/public_share.go",
+        "line_start": 31,
+        "line_end": 40,
+        "claim": "share copy 会写入 share_copy_events 表，形成可追踪历史。"
+      }
+    ],
+    "coverage_notes": "已覆盖 share copy 的接口、服务语义与事件存储。"
+  },
+  {
+    "id": "invite_and_org_access",
+    "title": "邀请码加入与组织/企业接入申请",
+    "user_action": "用户输入邀请码申请加入，或者在 organization/enterprise 场景下提交本地接入申请和备注。",
+    "mechanism_question": "加入是不是即时生效，remark 有哪些边界，组织加入和邀请码加入是否复用一套状态存储？",
+    "distinguish": "这不是立即改真实权限；邀请码与组织加入都会变成本地 pending/application 记录，并带 externalEffect=false 风格的本地说明。 ",
+    "source_refs": [
+      {
+        "path": "frontend/renderer/page-manifest.js",
+        "line_start": 203,
+        "line_end": 223,
+        "claim": "前端存在 /invite/:inviteCode 明确入口，邀请码不是隐藏接口。"
+      },
+      {
+        "path": "backend/internal/httpapi/invites.go",
+        "line_start": 40,
+        "line_end": 49,
+        "claim": "邀请码申请有独立 apply 接口，并会校验 invite code 格式。"
+      },
+      {
+        "path": "backend/internal/store/invites.go",
+        "line_start": 62,
+        "line_end": 73,
+        "claim": "邀请码加入只会写入 invite_applications pending 记录，message 明确不会提交真实项目权限变更。"
+      },
+      {
+        "path": "backend/internal/httpapi/organizations.go",
+        "line_start": 35,
+        "line_end": 44,
+        "claim": "组织接入是另一条显式 action API，支持 kind/action/organizationId/remark。"
+      },
+      {
+        "path": "backend/internal/service/organizations.go",
+        "line_start": 34,
+        "line_end": 50,
+        "claim": "组织接入会校验 kind、remark 长度、organizationID 合法性，再分派给 store.ApplyOrganizationJoin。"
+      },
+      {
+        "path": "backend/internal/store/organizations.go",
+        "line_start": 78,
+        "line_end": 90,
+        "claim": "ApplyOrganizationJoin 会检查是否已加入，未加入时写入 application，而不是直接置 joined=true。"
+      }
+    ],
+    "coverage_notes": "已覆盖邀请码入口、邀请申请、组织 action、service 校验、store 申请写入。"
+  },
+  {
+    "id": "bridge_invoke",
+    "title": "Coze Bridge 方法调用审计",
+    "user_action": "用户或桌面桥接层提交一个 bridge method 与 JSON payload，请求本地系统代理某种受限调用。",
+    "mechanism_question": "bridge 是否允许任意 method，payload 如何审计，错误是否也被记录？",
+    "distinguish": "这不是通用 RPC passthrough；method 必须在 allowlist 中，payload 必须是合法 JSON，结果会带审计形状归档。 ",
+    "source_refs": [
+      {
+        "path": "frontend/bridge-ipc.cjs",
+        "line_start": 9,
+        "line_end": 14,
+        "claim": "前端 bridge IPC 统一把 method/payload POST 到 /api/bridge/invoke。"
+      },
+      {
+        "path": "backend/internal/httpapi/bridge.go",
+        "line_start": 53,
+        "line_end": 68,
+        "claim": "bridge API 要求 method 非空且 payload 为有效 JSON，否则直接返回 INVALID_BRIDGE_REQUEST。"
+      },
+      {
+        "path": "backend/internal/service/bridge.go",
+        "line_start": 40,
+        "line_end": 54,
+        "claim": "InvokeBridge 会先检查 bridgeMethods allowlist，再解析 payload 成 map。"
+      },
+      {
+        "path": "backend/internal/service/bridge.go",
+        "line_start": 54,
+        "line_end": 67,
+        "claim": "bridge 不论成功失败都会形成 result/status 语义，便于上层做统一审计展示。"
+      }
+    ],
+    "coverage_notes": "已覆盖 IPC、HTTP 验证、service allowlist 与统一结果封装。"
+  },
+  {
+    "id": "settings_models_and_debug",
+    "title": "本地设置、模型目录与 Builder Debug 状态",
+    "user_action": "用户修改设置、增删模型，或在 builder debug 页面持续编辑 A2UI/debug flags/PPT 状态。",
+    "mechanism_question": "普通设置和 builder debug 是不是同一套存储，debug JSON 如何校验，修改后是否真的持久化？",
+    "distinguish": "这是两层能力：settings/models 是常规偏好与模型名录；debug state 是面向 builder 的结构化 JSON/flags 持久化，不是简单 textarea 临时值。 ",
+    "source_refs": [
+      {
+        "path": "frontend/renderer/page-manifest.js",
+        "line_start": 249,
+        "line_end": 260,
+        "claim": "前端存在 /builder-debug 页面，debug 不是隐藏开发态变量。"
+      },
+      {
+        "path": "frontend/renderer/app.js",
+        "line_start": 186,
+        "line_end": 193,
+        "claim": "renderer 通过 window.electronAPI.debug.update 持久化 debug patch，而不是只改内存 state。"
+      },
+      {
+        "path": "frontend/settings-ipc.cjs",
+        "line_start": 13,
+        "line_end": 23,
+        "claim": "settings:get/update 与 models:list/add/remove 都是独立 IPC 能力。"
+      },
+      {
+        "path": "backend/internal/httpapi/settings.go",
+        "line_start": 92,
+        "line_end": 110,
+        "claim": "后端明确支持 /api/settings GET/PATCH，并返回“设置已保存到本地后端”。"
+      },
+      {
+        "path": "backend/internal/service/settings_models.go",
+        "line_start": 23,
+        "line_end": 39,
+        "claim": "UpdateSettings 逐项合并 theme/language/notifications/safeMode，不是整块覆盖。"
+      },
+      {
+        "path": "backend/internal/service/settings_models.go",
+        "line_start": 53,
+        "line_end": 73,
+        "claim": "模型创建会生成本地 model-local-* ID，删除会校验 ID 格式，说明模型目录是可写资源。"
+      },
+      {
+        "path": "backend/internal/httpapi/echo_debug_state.go",
+        "line_start": 26,
+        "line_end": 35,
+        "claim": "builder debug patch 有独立 API，不与普通 settings 共用。"
+      },
+      {
+        "path": "backend/internal/service/debug_state.go",
+        "line_start": 23,
+        "line_end": 41,
+        "claim": "debug 更新会校验 a2uiIdentity 和 a2uiJson；JSON 过大或非法会直接报错。"
+      },
+      {
+        "path": "backend/internal/store/debug_state.go",
+        "line_start": 46,
+        "line_end": 60,
+        "claim": "debug state 既 upsert 主状态，也写 debug_state_events，说明保留了变更审计。"
+      }
+    ],
+    "coverage_notes": "已覆盖前端 debug 页面、renderer 持久化、settings/models IPC、后端 settings 模型、debug JSON 校验与事件审计。"
+  },
+  {
+    "id": "archive_history_resources",
+    "title": "工作区文件、历史记录与视频项目归档",
+    "user_action": "用户查看工作区文件清单、浏览历史记录、清空历史、查看视频项目列表与详情。",
+    "mechanism_question": "归档只是前端样例数据还是后端真正维护的多个资源表，清空历史是否真删库？",
+    "distinguish": "这不是首页消息历史的别名；archive 维度单独维护 workspace files、activity history、video projects 三类资源。 ",
+    "source_refs": [
+      {
+        "path": "backend/internal/httpapi/archive.go",
+        "line_start": 22,
+        "line_end": 28,
+        "claim": "后端显式暴露 archive files 接口。"
+      },
+      {
+        "path": "backend/internal/httpapi/archive.go",
+        "line_start": 30,
+        "line_end": 36,
+        "claim": "后端显式暴露 archive history 接口。"
+      },
+      {
+        "path": "backend/internal/httpapi/archive.go",
+        "line_start": 46,
+        "line_end": 52,
+        "claim": "后端显式暴露 archive videos 接口。"
+      },
+      {
+        "path": "backend/internal/service/archive.go",
+        "line_start": 14,
+        "line_end": 30,
+        "claim": "Core 对 workspace files、history、video projects 都有单独读取入口。"
+      },
+      {
+        "path": "backend/internal/service/archive.go",
+        "line_start": 22,
+        "line_end": 24,
+        "claim": "ClearHistory 不是 UI 重置，而是 service 调用 store 清空历史。"
+      },
+      {
+        "path": "backend/internal/store/archive.go",
+        "line_start": 46,
+        "line_end": 56,
+        "claim": "ClearHistory 在 store 层直接 DELETE activity_history，并返回受影响行数。"
+      }
+    ],
+    "coverage_notes": "已覆盖 API、service、store 三层，明确 archive 是独立资源域且支持真实本地删除。"
+  }
+]

@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.repo-teacher/
+.mypy_cache/
+.ruff_cache/
+.omx/
+.DS_Store
+*.log
+
+# Generated report generations and local publication backups.
+outputs/
+examples/reference-selection/
+examples/reference-selection.pre-generation-*/
+examples/compatibility/
+.repo-teacher-generations/
+.repo-teacher.lock

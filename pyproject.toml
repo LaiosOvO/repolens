@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "repo-teacher"
+version = "0.1.0"
+description = "Local-first deterministic repository index and standalone HTML report"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "Local Agent Workspace"}]
+dependencies = []
+
+[project.scripts]
+repo-teacher = "repo_teacher.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

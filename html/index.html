@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>代码仓库教学与复用索引｜产品简报</title>
+  <style>
+    :root {
+      --bg:#f3f0e8; --paper:#fffdf8; --ink:#1d211e; --muted:#646b65;
+      --line:#d8d8ce; --green:#176c51; --green-soft:#dff1e8;
+      --orange:#ed6a35; --orange-soft:#fff0e8; --blue:#2c5aa0;
+      --shadow:0 18px 60px rgba(35,42,36,.09);
+    }
+    @media (prefers-color-scheme:dark) {
+      :root { --bg:#151917; --paper:#1d221f; --ink:#f1f5f1; --muted:#aab3ac;
+        --line:#3b433e; --green:#7fd6b1; --green-soft:#213e32;
+        --orange:#ff9063; --orange-soft:#3e2b22; --blue:#95b9ff; --shadow:none; }
+    }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; background:var(--bg); }
+    body { margin:0; color:var(--ink); background:var(--bg); font:16px/1.7 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif; }
+    a { color:var(--green); text-underline-offset:3px; }
+    .shell { width:min(1180px,100%); margin:auto; background:var(--paper); box-shadow:var(--shadow); min-height:100vh; }
+    header { position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between; gap:20px; padding:14px 42px; border-bottom:1px solid var(--line); background:color-mix(in srgb,var(--paper) 92%,transparent); backdrop-filter:blur(14px); }
+    .brand { color:var(--ink); font:800 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.12em; text-decoration:none; }
+    nav { display:flex; gap:20px; overflow:auto; white-space:nowrap; }
+    nav a { color:var(--muted); font-size:13px; font-weight:700; text-decoration:none; }
+    nav a:hover { color:var(--ink); }
+    main { padding:0 42px 80px; }
+    .hero { display:grid; grid-template-columns:1.3fr .7fr; gap:46px; padding:76px 0 56px; border-bottom:1px solid var(--line); }
+    .eyebrow { margin:0 0 20px; color:var(--green); font-size:12px; font-weight:850; letter-spacing:.14em; text-transform:uppercase; }
+    h1,h2,h3 { line-height:1.16; letter-spacing:-.035em; }
+    h1 { max-width:780px; margin:0; font-size:clamp(2.6rem,6vw,5.5rem); font-weight:860; }
+    .lede { max-width:720px; margin:28px 0 0; color:var(--muted); font-size:clamp(1.06rem,2vw,1.32rem); }
+    .scope { align-self:end; padding:24px; border:1px solid var(--line); border-radius:20px; background:color-mix(in srgb,var(--paper) 83%,var(--green-soft)); }
+    .scope strong { display:block; margin-bottom:10px; font-size:18px; }
+    .scope p { margin:0; color:var(--muted); }
+    section { padding:68px 0 0; }
+    .section-head { display:grid; grid-template-columns:.42fr 1fr; gap:36px; align-items:start; margin-bottom:28px; }
+    .section-kicker { color:var(--orange); font:800 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.12em; text-transform:uppercase; }
+    h2 { max-width:780px; margin:0; font-size:clamp(1.9rem,4vw,3.45rem); }
+    h3 { margin:0; font-size:1.28rem; }
+    .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+    .summary-card { min-height:210px; padding:24px; border:1px solid var(--line); border-radius:20px; }
+    .summary-card b { display:block; margin-bottom:34px; color:var(--green); font:850 13px/1 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .summary-card strong { display:block; margin-bottom:9px; font-size:21px; line-height:1.3; }
+    .summary-card p { margin:0; color:var(--muted); font-size:14px; }
+    .contrast { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .contrast article { padding:30px; border:1px solid var(--line); border-radius:22px; }
+    .contrast article:first-child { background:var(--orange-soft); }
+    .contrast article:last-child { background:var(--green-soft); }
+    .contrast ul { margin:22px 0 0; padding-left:20px; }
+    .contrast li { margin:8px 0; }
+    .flow { display:grid; grid-template-columns:repeat(5,1fr); gap:0; counter-reset:step; }
+    .flow article { position:relative; min-height:190px; padding:24px 18px 20px; border-block:1px solid var(--line); border-right:1px solid var(--line); counter-increment:step; }
+    .flow article:first-child { border-left:1px solid var(--line); border-radius:18px 0 0 18px; }
+    .flow article:last-child { border-radius:0 18px 18px 0; background:var(--green-soft); }
+    .flow article::before { content:"0" counter(step); display:block; margin-bottom:30px; color:var(--orange); font:850 12px/1 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .flow strong { display:block; margin-bottom:8px; font-size:18px; }
+    .flow p { margin:0; color:var(--muted); font-size:13px; line-height:1.55; }
+    .report-demo { display:grid; grid-template-columns:.34fr .66fr; gap:18px; }
+    .report-nav { padding:18px; border:1px solid var(--line); border-radius:20px; }
+    .report-nav span { display:block; padding:13px 14px; border-bottom:1px solid var(--line); color:var(--muted); font-size:14px; }
+    .report-nav span:first-child { color:var(--ink); border-radius:12px; background:var(--green-soft); font-weight:800; }
+    .feature { padding:30px; border:1px solid var(--line); border-radius:20px; }
+    .badge { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; background:var(--green-soft); color:var(--green); font-size:12px; font-weight:800; }
+    .feature h3 { margin:15px 0 10px; font-size:1.7rem; }
+    .feature > p { margin:0 0 26px; color:var(--muted); }
+    .mechanism { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:24px 0; }
+    .mechanism span { padding:12px; border-radius:10px; background:color-mix(in srgb,var(--paper) 72%,var(--green-soft)); font-size:12px; text-align:center; }
+    .decision { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .decision div { padding:14px; border-left:3px solid var(--line); color:var(--muted); font-size:13px; }
+    .decision b { display:block; color:var(--ink); }
+    .export { display:grid; grid-template-columns:.85fr 1.15fr; gap:18px; }
+    .selector,.package { padding:28px; border:1px solid var(--line); border-radius:22px; }
+    .selector label { display:flex; align-items:center; gap:12px; margin:12px 0; padding:13px 14px; border:1px solid var(--line); border-radius:12px; cursor:pointer; }
+    .selector input { accent-color:var(--green); width:17px; height:17px; }
+    .hint { color:var(--muted); font-size:13px; }
+    .file-tree { margin:22px 0 0; padding:22px; border-radius:14px; background:#151a17; color:#dbe9df; font:13px/1.9 ui-monospace,SFMono-Regular,Menlo,monospace; overflow:auto; }
+    .file-tree b { color:#82d6ae; }
+    .file-tree i { color:#ff9b72; font-style:normal; }
+    .mapping { margin-top:16px; display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+    .mapping span { padding:10px 6px; border:1px solid var(--line); border-radius:10px; font-size:11px; text-align:center; }
+    .reference-list { display:grid; gap:10px; }
+    .reference { display:grid; grid-template-columns:.27fr .36fr .37fr; gap:20px; padding:18px 20px; border:1px solid var(--line); border-radius:14px; }
+    .reference strong { font-size:15px; }
+    .reference span { color:var(--muted); font-size:14px; }
+    .reference em { color:var(--ink); font-size:13px; font-style:normal; }
+    .mvp { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .mvp article { padding:28px; border:1px solid var(--line); border-radius:20px; }
+    .mvp article:last-child { background:color-mix(in srgb,var(--paper) 80%,var(--orange-soft)); }
+    .mvp ul { padding-left:20px; }
+    details { margin-top:18px; padding:18px 20px; border:1px solid var(--line); border-radius:14px; }
+    summary { cursor:pointer; font-weight:800; }
+    footer { margin-top:76px; padding-top:26px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+    @media(max-width:850px) {
+      header { padding:12px 20px; } main { padding:0 20px 54px; }
+      .hero,.section-head,.report-demo,.export { grid-template-columns:1fr; }
+      .hero { padding-top:52px; } .scope { align-self:auto; }
+      .summary-grid { grid-template-columns:1fr 1fr; }
+      .flow { grid-template-columns:1fr; }
+      .flow article,.flow article:first-child,.flow article:last-child { min-height:0; border:1px solid var(--line); border-bottom:0; border-radius:0; }
+      .flow article:first-child { border-radius:16px 16px 0 0; }
+      .flow article:last-child { border-bottom:1px solid var(--line); border-radius:0 0 16px 16px; }
+      .mechanism,.decision,.mapping { grid-template-columns:1fr 1fr; }
+      .reference { grid-template-columns:1fr; gap:6px; }
+    }
+    @media(max-width:560px) {
+      header nav { display:none; } h1 { font-size:2.65rem; }
+      .summary-grid,.contrast,.mvp { grid-template-columns:1fr; }
+      .summary-card { min-height:0; } .summary-card b { margin-bottom:18px; }
+      .mechanism,.decision,.mapping { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <a class="brand" href="../PRODUCT-BRIEF.md">REPO / TEACHER</a>
+    <nav aria-label="本页目录">
+      <a href="#verdict">结论</a><a href="#shape">报告结构</a><a href="#export">导出包</a><a href="#references">参考</a><a href="#scope">第一版</a>
+    </nav>
+  </header>
+  <main>
+    <section class="hero" id="verdict">
+      <div>
+        <p class="eyebrow">产品简报 · 不是详细技术设计</p>
+        <h1>把陌生仓库讲成一个可以做决定的故事。</h1>
+        <p class="lede">先让你看懂它值不值得借、核心功能如何落到源码；选中模块后，再导出 Agent 能直接使用的 Skill 与代码索引。</p>
+      </div>
+      <aside class="scope">
+        <strong>当前只解决第二个产品</strong>
+        <p>代码仓库教学、功能取舍、模块选择与上下文导出。项目看板、ACP 和本地 CLI 派单留到后续阶段。</p>
+      </aside>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="section-kicker">30 秒结论</span><h2>不是再生成一份更长的 Wiki。</h2></div>
+      <div class="summary-grid">
+        <article class="summary-card"><b>01</b><strong>结论先行</strong><p>首屏先告诉你项目价值、最值得借什么和最大限制。</p></article>
+        <article class="summary-card"><b>02</b><strong>功能而非目录</strong><p>能力来自实际产品行为，不把 README 标题和工具文件当成功能。</p></article>
+        <article class="summary-card"><b>03</b><strong>一条真实主线</strong><p>每个核心功能都要讲清入口、编排、状态、输出和测试。</p></article>
+        <article class="summary-card"><b>04</b><strong>选择后可执行</strong><p>选中功能即可导出 Skill、符号级模块索引和阅读路线。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="section-kicker">问题判断</span><h2>旧页面的问题是信息模型，不是样式。</h2></div>
+      <div class="contrast">
+        <article><h3>现在：仓库盘点</h3><ul><li>README 标题直接变成功能</li><li>每项套相同的层级描述</li><li>列很多文件，却没有请求主线</li><li>实现证据和复用决定混在一起</li></ul></article>
+        <article><h3>目标：源码教学</h3><ul><li>用业务语言重组真正的能力</li><li>用黄金路径解释独有机制</li><li>证据按需展开、符号可追踪</li><li>结尾明确拿走、重写和放弃什么</li></ul></article>
+      </div>
+    </section>
+
+    <section id="shape">
+      <div class="section-head"><span class="section-kicker">总—分—总</span><h2>每个项目页固定走完五步。</h2></div>
+      <div class="flow">
+        <article><strong>先给判断</strong><p>一句话定位、价值等级、最大限制、推荐动作。</p></article>
+        <article><strong>能力地图</strong><p>只列真正独立、用户可感知的核心能力。</p></article>
+        <article><strong>黄金路径</strong><p>一个真实请求如何从入口穿过源码并产出结果。</p></article>
+        <article><strong>功能卡</strong><p>机制、关键符号、测试证据和风险逐项展开。</p></article>
+        <article><strong>回到取舍</strong><p>拿走什么、重写什么、不要拿什么、下一步做什么。</p></article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head"><span class="section-kicker">页面示意</span><h2>代码证据服务于理解，而不是占满页面。</h2></div>
+      <div class="report-demo">
+        <div class="report-nav"><span>30 秒判断</span><span>产品能力地图</span><span>一次请求的主线</span><span>功能：交互式会话</span><span>功能：工具与 Hooks</span><span>复用决定</span></div>
+        <article class="feature">
+          <span class="badge">建议：改造复用</span>
+          <h3>交互式 Agent 会话</h3>
+          <p>用户持续发送消息，运行时保留会话并把工具结果回传；价值在于双向状态管理，而不是一个 Client 类名。</p>
+          <div class="mechanism"><span>用户输入</span><span>会话编排</span><span>CLI / 工具流</span><span>增量结果</span></div>
+          <div class="decision"><div><b>拿走</b>异步双向消息接口与会话测试</div><div><b>重写</b>Provider 绑定和权限控制</div><div><b>不要拿</b>把宿主 CLI 当作安全沙箱</div></div>
+          <details><summary>展开源码证据</summary><p>这里才显示入口文件、关键符号、定义/引用、控制流和对应测试。默认页面不再先铺满文件表。</p></details>
+        </article>
+      </div>
+    </section>
+
+    <section id="export">
+      <div class="section-head"><span class="section-kicker">核心新增</span><h2>选中功能后，导出 Agent 的工作包。</h2></div>
+      <div class="export">
+        <div class="selector">
+          <h3>示意：选择要复用的功能</h3>
+          <p class="hint">真实产品中，选择还要带上目的：学习、对比、移植、重写或补测试。</p>
+          <label><input type="checkbox" checked> 交互式会话</label>
+          <label><input type="checkbox" checked> 工具与 Hooks</label>
+          <label><input type="checkbox"> Session fork</label>
+          <label><input type="checkbox"> 发布工作流</label>
+          <p class="hint">分析结果必须固定到 commit；仓库变化后先做漂移检查。</p>
+        </div>
+        <div class="package">
+          <h3>导出包不是一篇文章</h3>
+          <div class="file-tree"><b>selected-feature-pack/</b><br>├── <i>SKILL.md</i>　　　　　　# Agent 的工作流程<br>├── module-index.md　　 # 人读的模块路线<br>├── module-index.yaml　 # 机器读的符号索引<br>├── feature-tour.tour　 # 可选的编辑器导览<br>└── evidence.md　　　　 # 证据与未验证项</div>
+          <div class="mapping"><span>功能</span><span>模块</span><span>文件</span><span>符号 / 引用</span><span>测试 / 风险</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="references">
+      <div class="section-head"><span class="section-kicker">研究结论</span><h2>现成方案各借一块，不照搬一个。</h2></div>
+      <div class="reference-list">
+        <div class="reference"><strong>Acquire Codebase Knowledge</strong><span>借：事实扫描、证据门、未知项显式标记。</span><em>不负责产品优先级与复用决定。</em></div>
+        <div class="reference"><strong>Code Tour / CodeTour</strong><span>借：面向角色的有序文件、行和模式导览。</span><em>解决“怎么读”，不解决“值不值得借”。</em></div>
+        <div class="reference"><strong>DeepWiki</strong><span>借：由用户指定页面目的和重点模块。</span><em>自动聚类覆盖不等于任务导向讲解。</em></div>
+        <div class="reference"><strong>CodeWiki / RepoAgent</strong><span>借：分层拆解、聚焦模块与增量更新。</span><em>作为生成底座，不作为默认页面结构。</em></div>
+        <div class="reference"><strong>GitHub / Sourcegraph</strong><span>借：符号、定义、引用与代码图上下文。</span><em>是索引层，不是最终教学产品。</em></div>
+      </div>
+      <details><summary>打开一手资料链接</summary><p><a href="https://github.com/github/awesome-copilot/blob/main/skills/acquire-codebase-knowledge/SKILL.md">Acquire Codebase Knowledge</a> · <a href="https://github.com/github/awesome-copilot/blob/main/skills/code-tour/SKILL.md">Code Tour Skill</a> · <a href="https://github.com/microsoft/codetour">Microsoft CodeTour</a> · <a href="https://docs.devin.ai/work-with-devin/deepwiki">DeepWiki</a> · <a href="https://github.com/FSoft-AI4Code/CodeWiki">CodeWiki</a> · <a href="https://github.com/OpenBMB/RepoAgent">RepoAgent</a> · <a href="https://docs.github.com/en/repositories/working-with-files/using-files/navigating-code-on-github">GitHub Code Navigation</a> · <a href="https://sourcegraph.com/docs/cody/core-concepts/context">Sourcegraph Cody Context</a></p></details>
+    </section>
+
+    <section id="scope">
+      <div class="section-head"><span class="section-kicker">MVP 边界</span><h2>第一版做到能做决定、能交接，不做大而全。</h2></div>
+      <div class="mvp">
+        <article><h3>必须做到</h3><ul><li>固定仓库 commit，识别 5–10 个核心能力</li><li>生成总—分—总 HTML 和一条黄金路径</li><li>功能卡落到关键符号、测试和证据</li><li>选择功能并导出 Skill + 人/机索引</li><li>关键代码变化时发现索引过期</li></ul></article>
+        <article><h3>这一版不做</h3><ul><li>不做通用 IDE 或自动改参考仓库</li><li>不做 ACP、Codex、OpenCode 派单</li><li>不追求一次覆盖仓库所有知识</li><li>不提前设计完整数据库、服务和知识图谱</li></ul></article>
+      </div>
+    </section>
+
+    <footer>完整文字版：<a href="../PRODUCT-BRIEF.md">PRODUCT-BRIEF.md</a>。本页是产品信息结构示范，不代表已经实现仓库分析器。</footer>
+  </main>
+</div>
+</body>
+</html>

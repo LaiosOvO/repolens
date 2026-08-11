@@ -1,0 +1,318 @@
+{
+  "sourcebridge": {
+    "commit": "2a128bf0c8461fae91d2b424d9168ddf205bb11b",
+    "capabilities": {
+      "graph-store": {
+        "path": "internal/graph/store.go",
+        "roles": [
+          {"symbol": "Store", "role": "状态所有权"},
+          {"symbol": "NewStore", "role": "内存索引初始化"},
+          {"symbol": "StoreIndexResult", "role": "索引结果写入"},
+          {"symbol": "SearchContent/GetCallers/GetCallees", "role": "图与内容查询"}
+        ],
+        "technology": ["store:in-memory", "retrieval:graph-query"],
+        "relationship_contract": [
+          {"source_slice_index": 2, "source_role": "索引结果写入", "target_slice_index": 0, "target_role": "状态所有权", "callsite_line_start": 305, "callsite_line_end": 305, "allowed_kinds": ["receiver-type"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_2c91c00d31b5b557", "kind": "receiver-type", "source": {"id": "symbol_5eef8dc8c2c6f577", "qualified_name": "Store.StoreIndexResult"}, "target": {"id": "symbol_22277b1f4446f76b", "qualified_name": "Store"}}
+        ],
+        "closure_sha256": "b28de8c1e89b952b4d4ae3db19adceea01d77c0b66e6761e549e53afb6432db5",
+        "technology_claims_sha256": "1a158ce4a22654fa94e2c6694b07b12d3d000da24bb026885b0d4a4f4dcdde16"
+      },
+      "execution-path": {
+        "path": "internal/graph/execution_path.go",
+        "roles": [
+          {"symbol": "TraceLikelyExecutionPath", "role": "路径编排"},
+          {"symbol": "traceCallerChain", "role": "上游调用者回溯"},
+          {"symbol": "selectPrimaryNeighbor", "role": "候选邻居评分"},
+          {"symbol": "executionNodeFromSymbol", "role": "源码定位投影"}
+        ],
+        "technology": ["store:graph", "retrieval:execution-path", "evidence:source-location"],
+        "relationship_contract": [
+          {"source_slice_index": 0, "source_role": "路径编排", "target_slice_index": 1, "target_role": "上游调用者回溯", "callsite_line_start": 43, "callsite_line_end": 43, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 1, "source_role": "上游调用者回溯", "target_slice_index": 2, "target_role": "候选邻居评分", "callsite_line_start": 73, "callsite_line_end": 73, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 0, "source_role": "路径编排", "target_slice_index": 2, "target_role": "候选邻居评分", "callsite_line_start": 52, "callsite_line_end": 52, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 0, "source_role": "路径编排", "target_slice_index": 3, "target_role": "源码定位投影", "callsite_line_start": 47, "callsite_line_end": 47, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_06fb6306885074ad", "kind": "calls", "source": {"id": "symbol_233eece2a33ece45", "qualified_name": "TraceLikelyExecutionPath"}, "target": {"id": "symbol_388c812196a5f863", "qualified_name": "executionNodeFromSymbol"}},
+          {"id": "rel_6ee107358422c0ed", "kind": "calls", "source": {"id": "symbol_8d0710fc5db656a0", "qualified_name": "traceCallerChain"}, "target": {"id": "symbol_e4e199a339de7600", "qualified_name": "selectPrimaryNeighbor"}},
+          {"id": "rel_bd8a96ea31ada1fa", "kind": "calls", "source": {"id": "symbol_233eece2a33ece45", "qualified_name": "TraceLikelyExecutionPath"}, "target": {"id": "symbol_8d0710fc5db656a0", "qualified_name": "traceCallerChain"}},
+          {"id": "rel_f7ca114a71bcff11", "kind": "calls", "source": {"id": "symbol_233eece2a33ece45", "qualified_name": "TraceLikelyExecutionPath"}, "target": {"id": "symbol_e4e199a339de7600", "qualified_name": "selectPrimaryNeighbor"}}
+        ],
+        "closure_sha256": "c9eee2b9bd485a9bb5dc0f611a624c46607221500b6417e2af4e6ed81dcd4604",
+        "technology_claims_sha256": "30f43a9fc23f45c77878dac950ee0c832b9884d7ddefe2e38ba90fb7ea7de155"
+      },
+      "code-tour": {
+        "path": "workers/knowledge/code_tour.py",
+        "roles": [
+          {"symbol": "generate_code_tour", "role": "提示词、模型调用与停止点构造"},
+          {"symbol": "TourStop", "role": "结构化停止点模型"},
+          {"symbol": "generate_code_tour", "role": "路径与证据门禁"}
+        ],
+        "technology": ["llm:provider-adapter", "retrieval:graph-context", "evidence:source-citation"],
+        "relationship_contract": [
+          {"source_slice_index": 0, "source_role": "提示词、模型调用与停止点构造", "target_slice_index": 1, "target_role": "结构化停止点模型", "callsite_line_start": 116, "callsite_line_end": 116, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_771e7bda4cfe3bd8", "kind": "calls", "source": {"id": "symbol_589d23221f967460", "qualified_name": "generate_code_tour"}, "target": {"id": "symbol_b8e34c02ed73ded8", "qualified_name": "TourStop"}}
+        ],
+        "closure_sha256": "394d431b344f45bcb7f12555e74964887b90234bbde33163df9c875f51e1885a",
+        "technology_claims_sha256": "2528e4ff20de1bf53e9b25179548ef8917a383412a8738b634f2d0f920fe1ee3"
+      }
+    }
+  },
+  "pocketflow-code2tutorial": {
+    "commit": "05b24cbbb0fe409c5e23c9791f0342f07524ffdc",
+    "capabilities": {
+      "tutorial-flow": {
+        "path": "flow.py",
+        "roles": [
+          {"symbol": "create_tutorial_flow", "role": "工作流节点实例化"},
+          {"symbol": "create_tutorial_flow", "role": "节点顺序与 Flow 起点"}
+        ],
+        "technology": ["framework:pocketflow", "llm:workflow-nodes"],
+        "closure_sha256": "61cb3c97ac679dda96c2c7fa074adf76551711aa6ade98c356da807c9d149e3c",
+        "technology_claims_sha256": "04a763a306937140d369d9e6fa55f64566d17c9e037b2c81befc1eed6bfe5411"
+      },
+      "tutorial-nodes": {
+        "path": "nodes.py",
+        "roles": [
+          {"symbol": "IdentifyAbstractions.prep", "role": "仓库上下文组装"},
+          {"symbol": "AnalyzeRelationships.prep", "role": "抽象关系上下文"},
+          {"symbol": "OrderChapters", "role": "章节排序输入"},
+          {"symbol": "WriteChapters.prep", "role": "章节写作批次"},
+          {"symbol": "CombineTutorial.prep", "role": "教程与图合并"}
+        ],
+        "technology": ["parser:repository-context", "framework:pocketflow", "llm:prompted-generation", "evidence:file-reference"],
+        "closure_sha256": "221a0aaf7451cfd7e72e97863d6b37f1983e2e9591f99e9212633a1fd9668947",
+        "technology_claims_sha256": "8606bb4c2a7fd09b07cf18b7a2ff046b2a51c30a5b37862a2aaa6957f285d3f0"
+      }
+    }
+  },
+  "openwiki": {
+    "commit": "7531d615216e8cbccf464f66cfbbae3668871c84",
+    "capabilities": {
+      "skeleton-critic": {
+        "path": "src/agent/skeleton_critic.ts",
+        "roles": [
+          {"symbol": "SKELETON_CRITIC_SYSTEM_PROMPT", "role": "独立源码审查流程"},
+          {"symbol": "SKELETON_CRITIC_SYSTEM_PROMPT", "role": "结构化裁决与通过门"},
+          {"symbol": "resolveSkeletonCriticSubagents", "role": "子 Agent 注册条件"}
+        ],
+        "technology": ["llm:subagent", "evidence:coverage-critique"],
+        "closure_sha256": "42455c9b0df48a966833aa6859dcc991454c5ce0ebbb7e294b836be0525704fb",
+        "technology_claims_sha256": "6841dca5a25c8b0e0ab06bd575bf6f6b7578f804774da8bc24dc4f92c2786bae"
+      },
+      "wiki-link-validator": {
+        "path": "src/agent/wiki-link-validator.ts",
+        "roles": [
+          {"symbol": "validateWikiInternalLinks", "role": "扫描、校验与回写编排"},
+          {"symbol": "extractMarkdownLinks/buildHeadingAnchors", "role": "Markdown 链接与锚点提取"},
+          {"symbol": "slugifyHeading/resolveRepoLinkPath", "role": "锚点规范化与路径解析"}
+        ],
+        "technology": ["parser:markdown", "retrieval:repository-files", "evidence:link-validation"],
+        "closure_sha256": "bb18d795269402b60884accf48fd14c5d4bf9ead56f442d8835753c59199e8f7",
+        "technology_claims_sha256": "11b92209012781866f0f7ae5a820e86dd49b60d2d3e0fa78140b4f43734e2aa8"
+      },
+      "ingestion": {
+        "path": "src/ingestion/ingestion.ts",
+        "roles": [
+          {"symbol": "runOpenWikiIngestion", "role": "连接器注册与逐源编排"},
+          {"symbol": "runSourceIngestion", "role": "拉取、Agent 更新与错误收敛"},
+          {"symbol": "resolveIngestionSourceInstances", "role": "摄取源筛选"},
+          {"symbol": "createSourceSynthesisPolicy", "role": "跨源写入策略"}
+        ],
+        "technology": ["framework:connector-registry", "store:backend-adapter", "incremental:ingestion-window", "llm:agent-run"],
+        "closure_sha256": "ab00ec2cab6ee7762432fba61e28be6cef8e1156e57359274566b4cdf5fde030",
+        "technology_claims_sha256": "e1cfd4e83f7f9be58de6b774bc262fde261f1c0d12a2d8d8bf30f4e63b8371af"
+      }
+    }
+  },
+  "understand-anything": {
+    "commit": "fe8c5bc591716aafd79b4765549328f08ef5a52e",
+    "capabilities": {
+      "context-builder": {
+        "path": "understand-anything-plugin/src/context-builder.ts",
+        "roles": [
+          {"symbol": "buildChatContext", "role": "搜索与一跳扩展"},
+          {"symbol": "buildChatContext", "role": "节点、边与层聚合"},
+          {"symbol": "formatContextForPrompt", "role": "提示上下文格式化"}
+        ],
+        "technology": ["store:knowledge-graph", "retrieval:search-and-neighbor-expansion", "llm:prompt-context"],
+        "closure_sha256": "abeb841153c310cf9e0ec9730ead4cdce2b0899a155aaa2e73cfdd1c7bfa6d5d",
+        "technology_claims_sha256": "cf90c545a9f4b9317ad455cdf7f8c2df821060bd0e0bda8b86b1ce59af7282cc"
+      },
+      "onboard-builder": {
+        "path": "understand-anything-plugin/src/onboard-builder.ts",
+        "roles": [
+          {"symbol": "buildOnboardingGuide", "role": "项目与架构层导览"},
+          {"symbol": "buildOnboardingGuide", "role": "概念与 tour 渐进阅读"},
+          {"symbol": "buildOnboardingGuide", "role": "文件地图与复杂度提示"}
+        ],
+        "technology": ["store:knowledge-graph", "retrieval:layered-tour", "evidence:file-node"],
+        "closure_sha256": "4f4acef420f22dad00637e31f3d56dfb8748d93e7cae66d38d4b457d9ea2ce05",
+        "technology_claims_sha256": "ca45ad6b6fc95a1eed685c60c65c4e0679d1f22329e1238822766afc58ee8529"
+      },
+      "explain-builder": {
+        "path": "understand-anything-plugin/src/explain-builder.ts",
+        "roles": [
+          {"symbol": "buildExplainContext", "role": "路径或符号目标解析"},
+          {"symbol": "buildExplainContext", "role": "子节点与一跳邻居聚合"},
+          {"symbol": "formatExplainPrompt", "role": "定点解释提示格式化"}
+        ],
+        "technology": ["parser:path-and-symbol-target", "store:knowledge-graph", "retrieval:connected-subgraph", "llm:explain-prompt", "evidence:target-node"],
+        "closure_sha256": "30b3206b226f33809e9852de8f38039d6432dfcc15aa21dea2aec478ccdcc009",
+        "technology_claims_sha256": "d429aff3aada5158a0f7097011b4a6e04be05b636a6491254898b17745ac72fc"
+      }
+    }
+  },
+  "codeboarding": {
+    "commit": "8c3f2218c3ecab1294902db5914f5e526f78524d",
+    "capabilities": {
+      "full-analysis": {
+        "path": "codeboarding_cli/commands/full_analysis.py",
+        "roles": [
+          {"symbol": "add_arguments", "role": "全量分析 CLI 参数"},
+          {"symbol": "run_from_args", "role": "本地与远程分发"},
+          {"symbol": "_run_local", "role": "本地分析与文档渲染"}
+        ],
+        "technology": ["framework:cli-workflow", "incremental:full-baseline", "evidence:analysis-artifacts"],
+        "relationship_contract": [
+          {"source_slice_index": 1, "source_role": "本地与远程分发", "target_slice_index": 2, "target_role": "本地分析与文档渲染", "callsite_line_start": 80, "callsite_line_end": 80, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_bba95b837ece89db", "kind": "calls", "source": {"id": "symbol_883c16bf9223661d", "qualified_name": "run_from_args"}, "target": {"id": "symbol_daec334160e00739", "qualified_name": "_run_local"}}
+        ],
+        "closure_sha256": "14e3c207521606bc5878bf4c9df6b30a369237cb67651eb935731a63d702c62f",
+        "technology_claims_sha256": "fb7a30cdeb3d25dcf4208ac829b0661cbe74c12bc43553f7c1c27a9a3eba707b"
+      },
+      "call-graph": {
+        "path": "static_analyzer/engine/call_graph_builder.py",
+        "roles": [
+          {"symbol": "CallGraphBuilder", "role": "类级分析边界与成员容器"},
+          {"symbol": "CallGraphBuilder.build", "role": "符号、边、层级与包依赖流水线"},
+          {"symbol": "CallGraphBuilder._discover_symbols", "role": "LSP documentSymbol 采集"},
+          {"symbol": "CallGraphBuilder._postprocess_edges", "role": "调用边去重与构造器扩展"}
+        ],
+        "technology": ["parser:language-adapter", "store:call-graph", "retrieval:definition-resolution", "evidence:call-sites"],
+        "relationship_contract": [
+          {"source_slice_index": 0, "source_role": "类级分析边界与成员容器", "target_slice_index": 1, "target_role": "符号、边、层级与包依赖流水线", "callsite_line_start": 45, "callsite_line_end": 45, "allowed_kinds": ["contains"]},
+          {"source_slice_index": 1, "source_role": "符号、边、层级与包依赖流水线", "target_slice_index": 2, "target_role": "LSP documentSymbol 采集", "callsite_line_start": 56, "callsite_line_end": 56, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 0, "source_role": "类级分析边界与成员容器", "target_slice_index": 2, "target_role": "LSP documentSymbol 采集", "callsite_line_start": 151, "callsite_line_end": 151, "allowed_kinds": ["contains"]},
+          {"source_slice_index": 1, "source_role": "符号、边、层级与包依赖流水线", "target_slice_index": 3, "target_role": "调用边去重与构造器扩展", "callsite_line_start": 68, "callsite_line_end": 68, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_06d0c516e83d686e", "kind": "calls", "source": {"id": "symbol_3a29dc7210b19095", "qualified_name": "CallGraphBuilder.build"}, "target": {"id": "symbol_00f4a3e3eb741094", "qualified_name": "CallGraphBuilder._discover_symbols"}},
+          {"id": "rel_7068513d96aaece8", "kind": "calls", "source": {"id": "symbol_3a29dc7210b19095", "qualified_name": "CallGraphBuilder.build"}, "target": {"id": "symbol_f6d218248db17d4d", "qualified_name": "CallGraphBuilder._postprocess_edges"}},
+          {"id": "rel_766796171943a4ca", "kind": "contains", "source": {"id": "symbol_e6f7d5d816ed1c92", "qualified_name": "CallGraphBuilder"}, "target": {"id": "symbol_3a29dc7210b19095", "qualified_name": "CallGraphBuilder.build"}},
+          {"id": "rel_de2e3233a9047164", "kind": "contains", "source": {"id": "symbol_e6f7d5d816ed1c92", "qualified_name": "CallGraphBuilder"}, "target": {"id": "symbol_00f4a3e3eb741094", "qualified_name": "CallGraphBuilder._discover_symbols"}}
+        ],
+        "closure_sha256": "d250caee144399457de6a6d689df864f38506168b28fd663f0337a09b512f899",
+        "technology_claims_sha256": "3b8f63480a252c1828ef1300dc5178edbc326f31db04f0782a4e2ed71c087635"
+      },
+      "component-clustering": {
+        "path": "static_analyzer/cluster_helpers.py",
+        "roles": [
+          {"symbol": "build_all_cluster_results", "role": "逐语言聚类与统一 ID"},
+          {"symbol": "_build_meta_graph", "role": "跨簇加权调用图"},
+          {"symbol": "supercluster_by_modularity_peak", "role": "Leiden 分辨率与模块度分组"},
+          {"symbol": "anchored_grouping", "role": "增量身份延续与漂移门"}
+        ],
+        "technology": ["store:call-graph", "retrieval:leiden-clustering", "incremental:cluster-cache", "evidence:cluster-file-map"],
+        "relationship_contract": [
+          {"source_slice_index": 2, "source_role": "Leiden 分辨率与模块度分组", "target_slice_index": 1, "target_role": "跨簇加权调用图", "callsite_line_start": 421, "callsite_line_end": 421, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 3, "source_role": "增量身份延续与漂移门", "target_slice_index": 1, "target_role": "跨簇加权调用图", "callsite_line_start": 530, "callsite_line_end": 530, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_66fada2956d3e052", "kind": "calls", "source": {"id": "symbol_c49f1b663a075852", "qualified_name": "anchored_grouping"}, "target": {"id": "symbol_882c9969fd0d844e", "qualified_name": "_build_meta_graph"}},
+          {"id": "rel_7df7acaf84b672a9", "kind": "calls", "source": {"id": "symbol_2f74e8ec87abb586", "qualified_name": "supercluster_by_modularity_peak"}, "target": {"id": "symbol_882c9969fd0d844e", "qualified_name": "_build_meta_graph"}}
+        ],
+        "closure_sha256": "5210e8bbfca74f7d8a5b3efbfab3da047bb6b672b3945f2a1116eb0d30737827",
+        "technology_claims_sha256": "0a8b441d35c2db1a62ba759f3495bb057629eb85def346a75aec72bfce6b1081"
+      }
+    }
+  },
+  "deepwiki-open": {
+    "commit": "4181daa5ebde79a1baf8e92a09dd874f8b74411b",
+    "capabilities": {
+      "codemap-router": {
+        "path": "api/routers/codemap.py",
+        "roles": [
+          {"symbol": "handle_websocket_codemap", "role": "WebSocket NDJSON 边界"},
+          {"symbol": "codemap_stream", "role": "HTTP 流式回退"},
+          {"symbol": "codemap_file", "role": "源码文件读取 API"}
+        ],
+        "technology": ["framework:fastapi", "evidence:request-schema"],
+        "closure_sha256": "90435a036b47eae39113e1f0430ee80daa851809acc9fa6b373232a4d362bdcc",
+        "technology_claims_sha256": "e387edee1adafff91fe43cc23a66a099aa97634a077ac08b8ad710cb10df2704"
+      },
+      "codemap-service": {
+        "path": "api/services/codemap.py",
+        "roles": [
+          {"symbol": "_generate_json", "role": "流式模型响应与重试"},
+          {"symbol": "_format_context", "role": "检索片段与真实行范围格式化"},
+          {"symbol": "_ground_citations", "role": "引用源码定位"},
+          {"symbol": "generate_codemap", "role": "检索与阶段事件编排"}
+        ],
+        "technology": ["framework:service-layer", "llm:codemap-generation", "evidence:citations"],
+        "relationship_contract": [
+          {"source_slice_index": 3, "source_role": "检索与阶段事件编排", "target_slice_index": 0, "target_role": "流式模型响应与重试", "callsite_line_start": 274, "callsite_line_end": 274, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 3, "source_role": "检索与阶段事件编排", "target_slice_index": 1, "target_role": "检索片段与真实行范围格式化", "callsite_line_start": 253, "callsite_line_end": 253, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 3, "source_role": "检索与阶段事件编排", "target_slice_index": 2, "target_role": "引用源码定位", "callsite_line_start": 309, "callsite_line_end": 309, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_7dc0998106d6b195", "kind": "calls", "source": {"id": "symbol_186287718d65f1d6", "qualified_name": "generate_codemap"}, "target": {"id": "symbol_c1a01c18cb270577", "qualified_name": "_generate_json"}},
+          {"id": "rel_f52a4226e41530d6", "kind": "calls", "source": {"id": "symbol_186287718d65f1d6", "qualified_name": "generate_codemap"}, "target": {"id": "symbol_4c6334699b45ca32", "qualified_name": "_ground_citations"}},
+          {"id": "rel_ffca11275fd40aa1", "kind": "calls", "source": {"id": "symbol_186287718d65f1d6", "qualified_name": "generate_codemap"}, "target": {"id": "symbol_f2b7c920e6bfe257", "qualified_name": "_format_context"}}
+        ],
+        "closure_sha256": "0808102de6d08a5665241c6dab9dadbf6f3670db0b36373d5bb6f71624490ebd",
+        "technology_claims_sha256": "9f7166c1a804882f86fe8d12c62f5404fdbe0321a984facab71e7a49210040ed"
+      },
+      "wiki-structure": {
+        "path": "api/services/wiki/structure.py",
+        "roles": [
+          {"symbol": "_page_from_element", "role": "XML 页面模型映射"},
+          {"symbol": "_pages_via_regex", "role": "页面正则降级解析"},
+          {"symbol": "parse_wiki_structure", "role": "清理、严格解析与降级编排"}
+        ],
+        "technology": ["parser:xml-and-regex-fallback", "evidence:page-source"],
+        "relationship_contract": [
+          {"source_slice_index": 2, "source_role": "清理、严格解析与降级编排", "target_slice_index": 0, "target_role": "XML 页面模型映射", "callsite_line_start": 174, "callsite_line_end": 174, "allowed_kinds": ["calls"]},
+          {"source_slice_index": 2, "source_role": "清理、严格解析与降级编排", "target_slice_index": 1, "target_role": "页面正则降级解析", "callsite_line_start": 180, "callsite_line_end": 180, "allowed_kinds": ["calls"]}
+        ],
+        "resolved_relationships": [
+          {"id": "rel_4b1c52e6bc670fd0", "kind": "calls", "source": {"id": "symbol_ece555c86e6ff62b", "qualified_name": "parse_wiki_structure"}, "target": {"id": "symbol_5cc3490f08ae89e5", "qualified_name": "_page_from_element"}},
+          {"id": "rel_dd245a0009eac36c", "kind": "calls", "source": {"id": "symbol_ece555c86e6ff62b", "qualified_name": "parse_wiki_structure"}, "target": {"id": "symbol_2688789ddd62e2b7", "qualified_name": "_pages_via_regex"}}
+        ],
+        "closure_sha256": "02c7ee78372c40f704cdba5ad88d3a1b68e3072848323c8d74057963fa9f274a",
+        "technology_claims_sha256": "d3d9e6e2a5f1994e220a17236a722585114361cdf9e075f19c6638322fcbe4f3"
+      },
+      "codemap-ui": {
+        "path": "src/components/CodeMap.tsx",
+        "roles": [
+          {"symbol": "PHASE_DETAIL/activePhase", "role": "生成阶段状态模型"},
+          {"symbol": "CitationChip", "role": "可点击引用芯片"},
+          {"symbol": "CodeMap", "role": "无数据时的阶段反馈"},
+          {"symbol": "CodeMap", "role": "章节、图和源码步骤展示"}
+        ],
+        "technology": ["framework:react", "evidence:citation-chip", "ui:codemap"],
+        "closure_sha256": "1953d5cec10d7629c9c5efb3548e9cbfee234c614c4e163ae0ad3f30d96941c9",
+        "technology_claims_sha256": "a08237a1e9c9d817bd4a936880b04fee027d766a8d2aa39dbfdbac09cb63eb32"
+      },
+      "code-viewer": {
+        "path": "src/components/CodeViewer.tsx",
+        "roles": [
+          {"symbol": "EXT_LANG/langOf", "role": "文件扩展名语言映射"},
+          {"symbol": "CodeViewer", "role": "按文件缓存源码请求"},
+          {"symbol": "CodeViewer", "role": "高亮区间自动滚动"},
+          {"symbol": "CodeViewer", "role": "标签页、行号与区间高亮"}
+        ],
+        "technology": ["framework:react", "retrieval:file-content-api", "evidence:line-highlight", "ui:code-viewer"],
+        "closure_sha256": "99c1e6dacf4dd07c966129118428a96f5fe199f92b2f7f3d0d3357fffbaa0529",
+        "technology_claims_sha256": "28a0332daad5a698f1ae2057eb2799f7a1ee5c620095b043db711997bbc2e849"
+      }
+    }
+  }
+}

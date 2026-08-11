@@ -35,7 +35,7 @@ from .persistence import (
 from .report import render_report
 
 
-REPORT_SYNTHESIS_CONTRACT_VERSION = "human-interaction-and-implementation-v10"
+REPORT_SYNTHESIS_CONTRACT_VERSION = "human-chapter-review-v11"
 
 
 def _bind_generation(payload: dict[str, object], generation_id: str) -> dict[str, object]:
@@ -1073,6 +1073,10 @@ def _chapter_batch_prompt(
   `cat` 或 `sed -n` 读取 scope.allowed_source_paths，禁止 rg、grep、find、tree 和整仓重扫。
 - 只能使用批次包 scope.allowed_source_paths 中明确列出的源码。
 - 每个 chapter 的 id 和 title 必须与 capability inventory 完全一致。
+- plain_summary 必须能独立接在“简单来说，这个功能就是：”后面，不能再次以章节 title 或
+  “简单来说”开头；第一句先说明它本质是什么，再展开机制。
+- runtime_story.output 必须写用户或下游能力最终收到的可观察结果，不能只是内部对象名，且不能
+  重复 plain_summary。章节的摘要、30 秒理解和运行过程必须分别回答“本质”“结果”“过程”。
 - example、demo 和 sample 只能作为相关业务能力的 worked_example 或源码证据出现，不能把示例名称重新提升为章节。
 - source_feature_ids 必须与 inventory 一致；evidence_ids 不能丢掉 inventory 已确认的证据。
 - source_refs 必须来自你实际打开过的当前仓库源码；至少 3 个，且至少 1 个来自非 docs/specs/README 的实现或测试源码。
@@ -2957,6 +2961,14 @@ def _normalize_project_overview(
         raise ValueError("project overview core and supporting capabilities overlap")
     if set(assigned_ids) | set(supporting) != set(expected_ids):
         raise ValueError("project overview capability hierarchy must cover every capability")
+    # The hierarchy is the reader's table of contents.  Make it authoritative so
+    # model-provided order cannot interleave supporting mechanics with the core
+    # product journey.
+    canonical_order = list(dict.fromkeys(assigned_ids + list(supporting)))
+    canonical_order.extend(
+        identifier for identifier in expected_ids if identifier not in canonical_order
+    )
+    overview["capability_order"] = canonical_order
     engineering_structure = overview.get("engineering_structure")
     if not isinstance(engineering_structure, dict):
         raise ValueError("project overview engineering_structure is missing")

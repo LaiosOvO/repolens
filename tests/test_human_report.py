@@ -218,12 +218,14 @@ class HumanReportTest(unittest.TestCase):
         self.assertIn("本质上是什么", instructions)
         self.assertIn("总—分—总", instructions)
         self.assertIn("标题后的第一句", instructions)
+        self.assertIn("不得重复章节标题", instructions)
         self.assertIn("PCM 采集 → ASR → LLM → TTS", instructions)
         self.assertIn("for/while/事件循环", instructions)
         self.assertIn("Router 输入/规则/输出", instructions)
         self.assertIn("串行、半双工或全双工", instructions)
         self.assertIn("不变量", instructions)
         self.assertIn("至少 3 个精确 source_refs", instructions)
+        self.assertIn("用户最终得到什么", pack["required_chapter_sections"])
         self.assertIn("一次任务完整怎么运行", pack["required_chapter_sections"])
 
     def test_large_pack_truncation_preserves_hint_evidence_closure(self) -> None:

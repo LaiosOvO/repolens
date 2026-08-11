@@ -350,6 +350,20 @@ def _human_copy(feature: dict[str, Any]) -> tuple[str, str]:
     )
 
 
+def _chapter_conclusion(value: object, title: str, fallback: str) -> str:
+    """Return a standalone human conclusion without repeating UI scaffolding."""
+    conclusion = _text(value, fallback).strip()
+    for prefix in ("简单来说，这个功能就是：", "简单来说，这个功能就是:", "简单来说，这个功能就是"):
+        if conclusion.startswith(prefix):
+            conclusion = conclusion[len(prefix):].lstrip()
+            break
+    if title and conclusion.startswith(title):
+        remainder = conclusion[len(title):].lstrip(" ：:—-·，,")
+        if remainder:
+            conclusion = remainder
+    return conclusion or fallback
+
+
 def _known_technology(feature: dict[str, Any]) -> list[str]:
     claims = feature.get("technology_claims", [])
     known = [
@@ -1316,6 +1330,7 @@ def _render_human_feature_chapter(
     evidence_by_id: dict[str, dict[str, Any]],
     project_root: str,
     position: int,
+    hierarchy_label: str = "业务功能",
 ) -> str:
     chapter = tutorial.get("human_chapter", {})
     if not isinstance(chapter, dict) or not chapter:
@@ -1363,14 +1378,24 @@ def _render_human_feature_chapter(
         + '</p></article>'
         for label, field in mechanism_fields
     )
-    plain_summary = _text(
+    plain_summary = _chapter_conclusion(
         mechanism_model.get("plain_summary"),
+        human_title,
         "当前证据还不足以概括这个功能的本质。",
     )
+    visible_outcome = _chapter_conclusion(
+        story.get("output"),
+        human_title,
+        "当前证据还不足以确认用户最终得到什么。",
+    )
     runtime_steps = story.get("steps", []) if isinstance(story.get("steps"), list) else []
-    runtime_preview = " → ".join(
-        _text(step) for step in runtime_steps[:4] if _text(step)
-    ) or "当前没有足够证据还原运行过程。"
+    readable_steps = [_text(step) for step in runtime_steps if _text(step)]
+    if len(readable_steps) >= 2:
+        runtime_preview = f"开始：{readable_steps[0]} 最后：{readable_steps[-1]}"
+    elif readable_steps:
+        runtime_preview = readable_steps[0]
+    else:
+        runtime_preview = "当前没有足够证据还原运行过程。"
     interaction_roles = (
         ("触发", story.get("trigger")),
         ("运行时接管", story.get("owner")),
@@ -1403,15 +1428,15 @@ def _render_human_feature_chapter(
     return (
         f'<article class="feature-card human-feature-card" id="feature-{position:03d}">'
         '<div class="feature-card-head"><div>'
-        f'<span class="feature-index">功能 {position:02d} · 业务功能 · 源码静态确认</span>'
+        f'<span class="feature-index">功能 {position:02d} · {html.escape(hierarchy_label)} · 源码静态确认</span>'
         f'<h3>{html.escape(human_title)}</h3>'
         '<p class="feature-thesis"><span>先说结论</span><strong>简单来说，这个功能就是：'
         f'{html.escape(plain_summary)}</strong></p>'
         f'<p class="chapter-question">{html.escape(_text(chapter.get("question"), human_summary))}</p>'
         '</div><span class="confidence-badge exact">功能级源码讲解</span></div>'
         '<section class="human-glance"><span class="answer-label">先用 30 秒理解</span>'
-        '<div class="glance-grid"><article class="glance-primary"><b>这个功能为什么存在</b>'
-        f'<strong>{html.escape(human_summary)}</strong></article>'
+        '<div class="glance-grid"><article class="glance-primary"><b>用户最终得到什么</b>'
+        f'<strong>{html.escape(visible_outcome)}</strong></article>'
         '<article><b>一次怎么跑</b>'
         f'<p>{html.escape(runtime_preview)}</p></article>'
         '<article><b>和相邻功能有什么不同</b>'
@@ -1549,6 +1574,7 @@ def _render_features(
     coverage: list[dict[str, Any]],
     modules_by_id: dict[str, dict[str, Any]],
     project_root: str,
+    project_overview: dict[str, Any] | None = None,
 ) -> str:
     if not features:
         return ""
@@ -1558,6 +1584,32 @@ def _render_features(
     tutorial_by_feature = {_text(item.get("feature_id")): item for item in tutorials if _text(item.get("feature_id"))}
     codemap_by_feature = {_text(item.get("feature_id")): item for item in codemaps if _text(item.get("feature_id"))}
     coverage_by_feature = {_text(item.get("feature_id")): item for item in coverage if _text(item.get("feature_id"))}
+    supporting_ids = {
+        _text(item)
+        for item in (
+            project_overview.get("supporting_capability_ids", [])
+            if isinstance(project_overview, dict)
+            and isinstance(project_overview.get("supporting_capability_ids"), list)
+            else []
+        )
+        if _text(item)
+    }
+    core_ids = {
+        _text(capability_id)
+        for axis in (
+            project_overview.get("core_product_axes", [])
+            if isinstance(project_overview, dict)
+            and isinstance(project_overview.get("core_product_axes"), list)
+            else []
+        )
+        if isinstance(axis, dict)
+        for capability_id in (
+            axis.get("capability_ids", [])
+            if isinstance(axis.get("capability_ids"), list)
+            else []
+        )
+        if _text(capability_id)
+    }
     cards_by_position: dict[int, str] = {}
     for position, feature in enumerate(features, start=1):
         steps = feature.get("steps", []) if isinstance(feature.get("steps", []), list) else []
@@ -1606,8 +1658,15 @@ def _render_features(
                 "调用顺序、错误路径和行为测试仍需源码审计。"
             )
         tutorial = tutorial_by_feature.get(feature_id)
+        chapter = tutorial.get("human_chapter", {}) if isinstance(tutorial, dict) else {}
+        chapter_id = _text(chapter.get("id")) if isinstance(chapter, dict) else ""
+        hierarchy_label = (
+            "支撑能力"
+            if chapter_id in supporting_ids
+            else "核心功能" if chapter_id in core_ids else "业务功能"
+        )
         human_feature = _render_human_feature_chapter(
-            feature, tutorial, evidence_by_id, project_root, position
+            feature, tutorial, evidence_by_id, project_root, position, hierarchy_label
         ) if tutorial is not None else ""
         if human_feature:
             cards_by_position[position] = (
@@ -1775,7 +1834,7 @@ def render_report(index: dict[str, Any]) -> str:
             '<section id="feature-details" class="feature-details">'
             '<div class="section-head"><span class="kicker">逐个讲清楚</span>'
             '<h2>每个功能都是一章完整的人类教程。</h2></div>'
-            f'<div class="capability-detail-stack">{_render_features(display_features, evidence, tutorials, codemaps, coverage, modules_by_id, _text(project.get("path")))}</div></section>'
+            f'<div class="capability-detail-stack">{_render_features(display_features, evidence, tutorials, codemaps, coverage, modules_by_id, _text(project.get("path")), project_overview)}</div></section>'
         )
         confidence_summary = (
             f"这份报告讲清了 {len(features)} 个功能；所有功能结论都绑定到确定性索引证据，"

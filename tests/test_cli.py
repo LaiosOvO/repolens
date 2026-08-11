@@ -38,7 +38,7 @@ class CliTest(unittest.TestCase):
         source_ref = {"path": "src/app.py", "line_start": 1, "line_end": 1, "claim": "evidence"}
         overview = {
             "project_overview": {
-                "capability_order": ["core", "support"],
+                "capability_order": ["support", "core"],
                 "core_product_axes": [
                     {"id": "core-axis", "capability_ids": ["core"], "source_refs": [source_ref]},
                     {"id": "support-bucket", "capability_ids": ["support"], "source_refs": [source_ref]},
@@ -67,6 +67,7 @@ class CliTest(unittest.TestCase):
         self.assertEqual(
             [axis["id"] for axis in result["core_product_axes"]], ["core-axis"]
         )
+        self.assertEqual(result["capability_order"], ["core", "support"])
 
     def test_grouping_excludes_supporting_http_surface_from_product_capabilities(
         self,

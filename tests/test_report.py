@@ -94,7 +94,7 @@ class ReportTest(unittest.TestCase):
             },
             "construction": {"explanation": "通过 bus 连接 worker。", "objects": []},
             "mechanism_model": {
-                "plain_summary": "它是一个让多个自治 worker 通过消息总线接活、回报进度并汇总结果的协作运行时。",
+                "plain_summary": "多 Worker 协同 本质上是一个让多个自治 worker 通过消息总线接活、回报进度并汇总结果的协作运行时。",
                 "storage": "活动 job group",
                 "write_path": "job request",
                 "read_path": "subscriber queue",
@@ -116,9 +116,20 @@ class ReportTest(unittest.TestCase):
         }
         tutorial = {"human_chapter": chapter, "difficulty_map": chapter["difficulty_map"]}
 
-        result = _render_human_feature_chapter(feature, tutorial, {}, "/tmp/pipecat", 1)
+        result = _render_human_feature_chapter(
+            feature, tutorial, {}, "/tmp/pipecat", 1, "核心功能"
+        )
 
         self.assertIn("简单来说，这个功能就是", result)
+        self.assertNotIn("简单来说，这个功能就是：多 Worker 协同 本质上", result)
+        self.assertIn("功能 01 · 核心功能 · 源码静态确认", result)
+        self.assertIn("用户最终得到什么", result)
+        self.assertIn("update、stream 与最终 response", result)
+        self.assertNotIn("这个功能为什么存在", result)
+        glance = result.split("一次任务完整怎么运行", 1)[0]
+        self.assertIn("开始：父 worker 创建 job group", glance)
+        self.assertIn("最后：父 worker 聚合 response 或取消剩余任务", glance)
+        self.assertNotIn("bus 把请求放入目标 worker 的订阅队列", glance)
         self.assertIn('class="interaction-diagram"', result)
         self.assertIn("父 worker 提交 job payload", result)
         self.assertIn("目标 worker 执行业务定义的 job handler", result)
@@ -230,7 +241,7 @@ class ReportTest(unittest.TestCase):
         self.assertNotIn("程序入口：waku/gateway/cli.py · main", visible)
         self.assertNotIn("02 · 从哪里进入", visible)
         self.assertNotIn("功能 01 · entrypoint-candidate", visible)
-        self.assertIn("这个功能为什么存在", visible)
+        self.assertIn("用户最终得到什么", visible)
         self.assertIn("一次任务完整怎么运行", visible)
         self.assertIn("核心机制怎么构建", visible)
         self.assertIn("状态是怎样一步步变化的", visible)

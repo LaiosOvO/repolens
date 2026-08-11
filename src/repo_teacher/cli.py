@@ -35,7 +35,7 @@ from .persistence import (
 from .report import render_report
 
 
-REPORT_SYNTHESIS_CONTRACT_VERSION = "global-graph-business-capability-v8"
+REPORT_SYNTHESIS_CONTRACT_VERSION = "global-graph-business-capability-v9"
 
 
 def _bind_generation(payload: dict[str, object], generation_id: str) -> dict[str, object]:
@@ -526,6 +526,15 @@ def _inventory_json_schema() -> dict[str, object]:
             "use_when": text,
             "distinguish": text,
             "plain_summary": text,
+            "importance": {
+                "type": "string",
+                "enum": [
+                    "core-journey",
+                    "differentiator",
+                    "dependent-capability",
+                    "supporting",
+                ],
+            },
             "user_actor": text,
             "user_goal": text,
             "visible_outcome": text,
@@ -554,6 +563,7 @@ def _inventory_json_schema() -> dict[str, object]:
             "use_when",
             "distinguish",
             "plain_summary",
+            "importance",
             "user_actor",
             "user_goal",
             "visible_outcome",
@@ -575,9 +585,35 @@ def _inventory_json_schema() -> dict[str, object]:
                 "type": "array",
                 "items": capability,
                 "minItems": 1,
-            }
+            },
+            "module_dispositions": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "path": text,
+                        "disposition": {
+                            "type": "string",
+                            "enum": ["core-capability", "supporting", "excluded"],
+                        },
+                        "capability_ids": {
+                            "type": "array",
+                            "items": text,
+                        },
+                        "reason": text,
+                    },
+                    "required": [
+                        "path",
+                        "disposition",
+                        "capability_ids",
+                        "reason",
+                    ],
+                    "additionalProperties": False,
+                },
+            },
         },
-        "required": ["capabilities"],
+        "required": ["capabilities", "module_dispositions"],
         "additionalProperties": False,
     }
 
@@ -851,8 +887,8 @@ def _inventory_prompt(pack_path: Path, source: Path) -> str:
   项目的功能数量。必须用 components 的全局中心、mechanism_clusters、modules、README 产品定位和源码摘录
   主动发现框架核心能力，尤其检查主数据流、会话/传输、状态/轮次、处理管线、服务适配与 Worker 等区域。
 - 这是唯一一次全局功能判断。禁止把模块分别当作独立项目，也禁止按目录逐个制造功能。
-- source_excerpts 已包含本次判断所需的代表性实现源码；禁止 shell、rg、find、tree 和整仓重扫，
-  只能打开 scope.allowed_source_paths。
+- source_excerpts 已包含本次判断所需的代表性实现源码。先用 `cat` 读取证据包；需要核对时只可用
+  `cat` 或 `sed -n` 读取 scope.allowed_source_paths，禁止 rg、grep、find、tree 和整仓重扫。
 
 ## 绝对要求
 - capability 是产品向用户提供的结果，不是“代码里存在的一条可调用路径”。每项输出前必须能回答：
@@ -871,6 +907,13 @@ def _inventory_prompt(pack_path: Path, source: Path) -> str:
 - 禁止把入口、helper、内部工具函数、目录名直接冒充功能。
 - 先核对 capability_graph.capability_candidates，再用 feature_slices / module_dependencies / source_refs 补证据；不要回到“整仓自由归纳”。
 - 最后做一次 coverage pass，确保每个独立用户动作都已归入 capabilities 或被明确排除；这里只输出已实现能力。
+- 必须逐个交代 scope.required_product_module_paths 中的产品实现模块：它是某项核心能力、某项能力的支撑，
+  还是不应进入功能目录。每个路径在 module_dispositions 中恰好出现一次；不能只读 CLI/route 候选就结束。
+  core-capability 必须绑定至少一个 capability id；supporting/excluded 也必须说明它实际支撑什么或为何排除。
+- capability.importance 用于阅读排序：core-journey 是用户完成主要目标的主链；differentiator 是项目相对同类
+  真正值得借鉴的机制；dependent-capability 是主链依赖的完整能力；supporting 仅在其本身仍有稳定对外结果时使用。
+- examples/testing/documentation/engineering-support 不在必须覆盖的产品模块集合里；只能补充真实产品模块的
+  worked example 或证据，绝不能因为文件多、路由多就压过核心框架实现。
 - 每项能力都要给 implementation_modules：列出共同完成这项能力的核心模块与支撑模块，说明责任和交接。
   一个能力可以跨多个模块；一个模块也可以支撑多个能力。不要把这种多对多关系压扁成“一个模块等于一个功能”。
   implementation_modules.path 必须逐字选自证据包 modules[].path；不要填文件路径。examples/testing/documentation
@@ -885,11 +928,14 @@ def _inventory_prompt(pack_path: Path, source: Path) -> str:
 - use_when: 什么时候你会因为这个能力考虑复用该项目。
 - distinguish: 它和看起来相似的另一类实现有什么本质区别。
 - plain_summary
+- importance
 - user_actor、user_goal、visible_outcome、product_surface、causal_flow、why_one_capability
 - implementation_modules: path、classification(core/supporting)、responsibility、handoff
 - source_feature_ids
 - evidence_ids
 - source_refs
+- module_dispositions: path、disposition、capability_ids、reason；必须完整覆盖
+  scope.required_product_module_paths，不能遗漏，也不能加入其它路径。
 
 使用 generator.name=Codex，generator.method=repo-teacher global graph business capability synthesis。
 """
@@ -909,7 +955,8 @@ def _inventory_shard_prompt(
 ## 本次范围
 - 主模块：{focused_modules}
 - 先读 capability_graph.capability_candidates、feature_slices 和 resolved_edges，再按需打开源码。
-- source_excerpts 已包含本次判断所需的源码切片；禁止执行 shell、rg、find、tree，也禁止重新扫描整个仓库。
+- source_excerpts 已包含本次判断所需的源码切片。先用 `cat` 读取分片包；需要核对时只可用
+  `cat` 或 `sed -n` 读取 scope.allowed_source_paths，禁止 rg、grep、find、tree；禁止重新扫描整个仓库。
 - 只能使用 scope.allowed_source_paths 中明确列出的源码；不得自由遍历其它目录。
 - 跨模块源码只有在图中已证明是调用者、消费者、状态读写点或依赖端点时才会进入允许列表。
 
@@ -947,7 +994,8 @@ def _project_overview_prompt(
 ) -> str:
     identifiers = ", ".join(capability_ids)
     return f"""你是一名面向技术选型读者的首席架构师。只读取有界证据包 {pack_path}，
-源码切片位于 {source}。禁止 shell、rg、find、tree 和整仓重扫。只返回 JSON object。
+源码切片位于 {source}。先用 `cat` 读取证据包；需要核对时只可用 `cat` 或 `sed -n` 读取
+scope.allowed_source_paths，禁止 rg、grep、find、tree 和整仓重扫。只返回 JSON object。
 
 你要写报告的第 0 章与第 1 章：先说明“这是什么项目”，再说明它的整体运行架构、
 前后端/控制面/Worker/数据层边界，以及主要代码目录分别封装什么。不能从入口函数开始讲。
@@ -1009,7 +1057,8 @@ def _chapter_batch_prompt(
 
 ## 绝对要求
 - 只为上面列出的 capability 输出章节；不能新增、删除或改名。
-- source_excerpts 已包含本批次所需源码；禁止执行 shell、rg、find、tree，也禁止重新扫描整个仓库。
+- source_excerpts 已包含本批次所需源码。先用 `cat` 读取批次包与功能目录；需要核对时只可用
+  `cat` 或 `sed -n` 读取 scope.allowed_source_paths，禁止 rg、grep、find、tree 和整仓重扫。
 - 只能使用批次包 scope.allowed_source_paths 中明确列出的源码。
 - 每个 chapter 的 id 和 title 必须与 capability inventory 完全一致。
 - example、demo 和 sample 只能作为相关业务能力的 worked_example 或源码证据出现，不能把示例名称重新提升为章节。
@@ -1446,9 +1495,9 @@ def _run_codex_json(
     codex = shutil.which("codex")
     if codex is None:
         raise ValueError("Codex CLI was not found; install Codex or pass --narrative")
-    codex_model = os.environ.get("REPO_TEACHER_CODEX_MODEL", "gpt-5.4-mini").strip()
+    codex_model = os.environ.get("REPO_TEACHER_CODEX_MODEL", "gpt-5.4").strip()
     reasoning_effort = os.environ.get(
-        "REPO_TEACHER_CODEX_REASONING_EFFORT", "medium"
+        "REPO_TEACHER_CODEX_REASONING_EFFORT", "low"
     ).strip()
     workspace.mkdir(parents=True, exist_ok=True)
     schema_path = workspace / f"{stage_slug}-schema.json"
@@ -1919,12 +1968,15 @@ def _module_view_path(path: object) -> str | None:
 
 
 def _module_view_category(path: str) -> str:
-    parts = {part.casefold() for part in _repo_path_parts(path)}
+    path_parts = _repo_path_parts(path)
+    parts = {part.casefold() for part in path_parts}
+    if any(part.startswith(".") for part in path_parts):
+        return "engineering-support"
     if parts & {"test", "tests", "fixtures"}:
         return "testing"
     if parts & {"example", "examples", "demo", "demos", "sample", "samples"}:
         return "examples"
-    if parts & {"doc", "docs", "spec", "specs"}:
+    if parts & {"doc", "docs", "spec", "specs", "changelog", "changes"}:
         return "documentation"
     if parts & {"script", "scripts", ".github", "build", "tools"}:
         return "engineering-support"
@@ -2011,6 +2063,17 @@ def _build_global_business_inventory_pack(
 
     graph = _compact_global_graph_context(pack.get("capability_graph"))
     module_views, module_view_dependencies = _build_module_views(pack, graph)
+    product_modules = [
+        item
+        for item in module_views
+        if item.get("category") == "product-implementation"
+    ]
+    representative_product_paths = {
+        path
+        for module in product_modules
+        for path in module.get("representative_paths", [])
+        if isinstance(path, str)
+    }
     graph_paths = _source_paths(graph)
     graph_feature_ids = {
         identifier
@@ -2025,7 +2088,12 @@ def _build_global_business_inventory_pack(
             continue
         hint_id = hint.get("id")
         hint_paths = _source_paths(hint)
-        if hint_id not in graph_feature_ids and not (hint_paths & graph_paths):
+        covers_product_module = bool(hint_paths & representative_product_paths)
+        if (
+            not covers_product_module
+            and hint_id not in graph_feature_ids
+            and not (hint_paths & graph_paths)
+        ):
             continue
         best_path = min(
             (_source_path_priority(path) for path in hint_paths),
@@ -2034,7 +2102,11 @@ def _build_global_business_inventory_pack(
         ranked_hints.append(
             (
                 (
-                    0 if hint_id in graph_feature_ids else 1,
+                    0
+                    if covers_product_module
+                    else 1
+                    if hint_id in graph_feature_ids
+                    else 2,
                     best_path,
                     position,
                 ),
@@ -2116,6 +2188,10 @@ def _build_global_business_inventory_pack(
         },
         "scope": {
             "module_paths": module_paths,
+            "required_product_module_paths": [
+                str(item["path"]) for item in product_modules
+            ],
+            "require_module_coverage": True,
             "allowed_source_paths": sorted(allowed_paths),
             "feature_ids": selected_feature_ids,
             "evidence_ids": sorted(
@@ -2617,6 +2693,20 @@ def _materialize_source_slice(
     return slice_root
 
 
+def _stage_model_json(
+    source_slice: Path,
+    filename: str,
+    payload: dict[str, object],
+) -> Path:
+    """Place model context inside the read-only source-slice sandbox."""
+
+    context_root = source_slice / ".repo-teacher-context"
+    context_root.mkdir(parents=True, exist_ok=True)
+    destination = context_root / filename
+    destination.write_text(_json_artifact(payload), encoding="utf-8")
+    return destination
+
+
 def _source_locations(value: object) -> dict[str, list[tuple[int, int]]]:
     result: dict[str, list[tuple[int, int]]] = {}
 
@@ -2862,6 +2952,12 @@ def _require_inventory_scope(
     capabilities = payload.get("capabilities")
     if not isinstance(capabilities, list) or not capabilities:
         raise ValueError("Codex inventory did not produce capabilities")
+    capability_ids = {
+        str(item.get("id"))
+        for item in capabilities
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    implementation_memberships: set[tuple[str, str]] = set()
     for capability in capabilities:
         if not isinstance(capability, dict):
             raise ValueError("Codex inventory produced a non-object capability")
@@ -2906,6 +3002,64 @@ def _require_inventory_scope(
                     raise ValueError(
                         f"Codex inventory has invalid module classification: {capability_id}"
                     )
+                implementation_memberships.add((str(path), capability_id))
+
+    if not scope.get("require_module_coverage"):
+        return
+    required_product_modules = {
+        path
+        for path in scope.get("required_product_module_paths", [])
+        if isinstance(path, str)
+    }
+    dispositions = payload.get("module_dispositions")
+    if not isinstance(dispositions, list):
+        raise ValueError("Codex inventory omitted module dispositions")
+    disposition_by_path: dict[str, dict[str, object]] = {}
+    disposition_memberships: set[tuple[str, str]] = set()
+    for disposition in dispositions:
+        if not isinstance(disposition, dict):
+            raise ValueError("Codex inventory has an invalid module disposition")
+        path = disposition.get("path")
+        status = disposition.get("disposition")
+        members = disposition.get("capability_ids")
+        reason = disposition.get("reason")
+        if (
+            not isinstance(path, str)
+            or path not in required_product_modules
+            or path in disposition_by_path
+        ):
+            raise ValueError("Codex inventory has an invalid module disposition path")
+        if status not in {"core-capability", "supporting", "excluded"}:
+            raise ValueError("Codex inventory has an invalid module disposition status")
+        if (
+            not isinstance(members, list)
+            or any(not isinstance(item, str) or item not in capability_ids for item in members)
+            or not isinstance(reason, str)
+            or not reason.strip()
+        ):
+            raise ValueError("Codex inventory has an invalid module disposition closure")
+        if status == "core-capability" and not members:
+            raise ValueError("Codex inventory left a core module without a capability")
+        disposition_by_path[path] = disposition
+        disposition_memberships.update((path, member) for member in members)
+    missing = sorted(required_product_modules - set(disposition_by_path))
+    if missing:
+        raise ValueError(
+            f"Codex inventory left unreviewed product modules: {missing[0]}"
+        )
+    if set(disposition_by_path) - required_product_modules:
+        raise ValueError("Codex inventory reviewed modules outside the product scope")
+    missing_memberships = sorted(
+        membership
+        for membership in implementation_memberships - disposition_memberships
+        if membership[0] in required_product_modules
+    )
+    if missing_memberships:
+        path, capability_id = missing_memberships[0]
+        raise ValueError(
+            "Codex inventory module disposition does not reference capability: "
+            f"{path}: {capability_id}"
+        )
 
 
 def _canonicalize_inventory_payload(
@@ -2938,6 +3092,15 @@ def _canonicalize_inventory_payload(
         )
         if isinstance(value, str)
     }
+    if not allowed_module_paths:
+        module_views, _ = _build_module_views(
+            packet, _compact_global_graph_context(packet.get("capability_graph"))
+        )
+        allowed_module_paths = {
+            str(item["path"])
+            for item in module_views
+            if isinstance(item.get("path"), str)
+        }
     accepted: list[dict[str, object]] = []
     rejected_examples: list[str] = []
     for capability in capabilities:
@@ -3028,15 +3191,15 @@ def _canonicalize_inventory_payload(
                         )
                 if resolved_path is None:
                     continue
-                normalized = copy.deepcopy(module)
-                normalized["path"] = resolved_path
+                normalized_module = copy.deepcopy(module)
+                normalized_module["path"] = resolved_path
                 existing = normalized_modules.get(resolved_path)
                 if existing is None:
-                    normalized_modules[resolved_path] = normalized
+                    normalized_modules[resolved_path] = normalized_module
                     continue
                 for field in ("responsibility", "handoff"):
                     old = str(existing.get(field) or "").strip()
-                    new = str(normalized.get(field) or "").strip()
+                    new = str(normalized_module.get(field) or "").strip()
                     if new and new not in old:
                         existing[field] = f"{old}；{new}" if old else new
                 if module.get("classification") == "core":
@@ -3050,6 +3213,30 @@ def _canonicalize_inventory_payload(
         raise ValueError(
             f"inventory produced no capability with canonical source closure ({detail})"
         )
+    dispositions = normalized.get("module_dispositions")
+    if isinstance(dispositions, list):
+        disposition_by_path = {
+            item.get("path"): item
+            for item in dispositions
+            if isinstance(item, dict) and isinstance(item.get("path"), str)
+        }
+        for capability in accepted:
+            capability_id = capability.get("id")
+            if not isinstance(capability_id, str):
+                continue
+            for module in capability.get("implementation_modules", []):
+                if not isinstance(module, dict):
+                    continue
+                disposition = disposition_by_path.get(module.get("path"))
+                if not isinstance(disposition, dict):
+                    continue
+                members = disposition.get("capability_ids")
+                if (
+                    isinstance(members, list)
+                    and capability_id not in members
+                    and disposition.get("disposition") != "excluded"
+                ):
+                    members.append(capability_id)
     normalized["capabilities"] = accepted
     return normalized
 
@@ -3060,16 +3247,24 @@ def _require_inventory_against_pack(
     module_views, _ = _build_module_views(
         pack, _compact_global_graph_context(pack.get("capability_graph"))
     )
+    module_paths = [
+        item.get("path")
+        for item in module_views
+        if isinstance(item, dict)
+        and isinstance(item.get("path"), str)
+        and item.get("path") != "."
+    ]
+    require_module_coverage = isinstance(payload.get("module_dispositions"), list)
     packet = {
         "scope": {
             "allowed_source_paths": sorted(_source_paths(pack)),
-            "module_paths": [
-                item.get("path")
+            "module_paths": module_paths,
+            "required_product_module_paths": [
+                str(item["path"])
                 for item in module_views
-                if isinstance(item, dict)
-                and isinstance(item.get("path"), str)
-                and item.get("path") != "."
+                if item.get("category") == "product-implementation"
             ],
+            "require_module_coverage": require_module_coverage,
             "feature_ids": [
                 item.get("id")
                 for item in pack.get("feature_hints", [])
@@ -3447,7 +3642,9 @@ def _synthesize_with_codex(
     if inventory_arg:
         inventory_input = read_json_path(Path(inventory_arg).expanduser())
         inventory_payload = _inventory_from_manifest(inventory_input, pack)
-        inventory_needs_grouping = True
+        inventory_needs_grouping = not isinstance(
+            inventory_payload.get("module_dispositions"), list
+        )
         print(
             f"[report 4/6] 已加载外部功能目录，共 {len(inventory_payload['capabilities'])} 项；跳过 inventory 模型阶段",
             flush=True,
@@ -3471,6 +3668,9 @@ def _synthesize_with_codex(
             inventory_workspace,
             inventory_pack["scope"]["allowed_source_paths"],
         )
+        model_inventory_pack_path = _stage_model_json(
+            source_slice, "analysis-pack-global.json", inventory_pack
+        )
         graph = inventory_pack.get("capability_graph")
         graph = graph if isinstance(graph, dict) else {}
         print(
@@ -3481,24 +3681,40 @@ def _synthesize_with_codex(
             "模块只用于功能判断与实现映射，不再分别调用模型",
             flush=True,
         )
-        inventory_payload = _run_codex_json(
-            source=source_slice,
-            workspace=inventory_workspace,
-            schema=_inventory_json_schema(),
-            prompt=_provider_prompt(
-                _inventory_prompt(inventory_pack_path, source_slice),
-                provider,
-                analysis_pack=inventory_pack,
-            ),
-            timeout=_remaining_model_timeout(deadline),
-            stage_slug="capability-inventory",
-            progress_label="Codex 正在基于整仓代码图归纳业务功能",
-            provider=provider,
-        )
-        inventory_payload = _canonicalize_inventory_payload(
-            inventory_payload, inventory_pack
-        )
-        _require_inventory_scope(inventory_payload, inventory_pack)
+        cached_inventory_path = inventory_workspace / "capability-inventory.json"
+        inventory_payload: dict[str, object] | None = None
+        if cached_inventory_path.is_file():
+            try:
+                candidate_inventory = _canonicalize_inventory_payload(
+                    read_json_path(cached_inventory_path), inventory_pack
+                )
+                _require_inventory_scope(candidate_inventory, inventory_pack)
+                inventory_payload = candidate_inventory
+                print(
+                    "[report 4/6] 复用已通过整仓模块覆盖门禁的功能目录缓存",
+                    flush=True,
+                )
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                inventory_payload = None
+        if inventory_payload is None:
+            inventory_payload = _run_codex_json(
+                source=source_slice,
+                workspace=inventory_workspace,
+                schema=_inventory_json_schema(),
+                prompt=_provider_prompt(
+                    _inventory_prompt(model_inventory_pack_path, source_slice),
+                    provider,
+                    analysis_pack=inventory_pack,
+                ),
+                timeout=_remaining_model_timeout(deadline),
+                stage_slug="capability-inventory",
+                progress_label="Codex 正在基于整仓代码图归纳业务功能",
+                provider=provider,
+            )
+            inventory_payload = _canonicalize_inventory_payload(
+                inventory_payload, inventory_pack
+            )
+            _require_inventory_scope(inventory_payload, inventory_pack)
     inventory_payload = _canonicalize_inventory_payload(inventory_payload, pack)
     _require_inventory_against_pack(inventory_payload, pack)
     if inventory_needs_grouping:
@@ -3539,6 +3755,9 @@ def _synthesize_with_codex(
         overview_workspace,
         overview_pack["scope"]["allowed_source_paths"],
     )
+    model_overview_pack_path = _stage_model_json(
+        overview_source, "analysis-pack-overview.json", overview_pack
+    )
     overview_result_path = overview_workspace / "project-overview.json"
     project_overview: dict[str, object] | None = None
     if overview_result_path.is_file():
@@ -3559,7 +3778,7 @@ def _synthesize_with_codex(
             schema=_project_overview_json_schema(len(capabilities)),
             prompt=_provider_prompt(
                 _project_overview_prompt(
-                    overview_pack_path,
+                    model_overview_pack_path,
                     overview_source,
                     capability_ids,
                 ),
@@ -3644,6 +3863,12 @@ def _synthesize_with_codex(
             batch_workspace,
             batch_pack["scope"]["allowed_source_paths"],
         )
+        model_batch_pack_path = _stage_model_json(
+            source_slice, "analysis-pack-batch.json", batch_pack
+        )
+        model_inventory_path = _stage_model_json(
+            source_slice, "capability-inventory.json", inventory_payload
+        )
         capability_batch_ids = [
             str(capability["id"])
             for capability in batch_capabilities
@@ -3655,8 +3880,8 @@ def _synthesize_with_codex(
             schema=_chapter_batch_json_schema(len(capability_batch_ids)),
             prompt=_provider_prompt(
                 _chapter_batch_prompt(
-                    batch_pack_path,
-                    inventory_path,
+                    model_batch_pack_path,
+                    model_inventory_path,
                     source_slice,
                     capability_batch_ids,
                 ),
@@ -3677,7 +3902,7 @@ def _synthesize_with_codex(
         cached_result_path.write_text(_json_artifact(payload), encoding="utf-8")
         return payload
 
-    max_workers = min(2, len(batches))
+    max_workers = min(4, len(batches))
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
             pool.submit(synthesize_batch, batch_index, batch): (batch_index, batch)

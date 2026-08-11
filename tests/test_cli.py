@@ -12,12 +12,14 @@ from repo_teacher.cli import (
     _build_chapter_batch_pack,
     _build_global_business_inventory_pack,
     _build_inventory_shard_pack,
+    _canonicalize_inventory_payload,
     _close_chapter_evidence,
     _decode_json_object,
     _inventory_from_manifest,
     _inventory_json_schema,
     _inventory_prompt,
     _inventory_shard_prompt,
+    _require_inventory_scope,
     _add_project_navigation,
     _model_prompt,
     _group_inventory_for_humans,
@@ -112,7 +114,142 @@ class CliTest(unittest.TestCase):
         self.assertIn("capabilities", schema["properties"])
         capability_schema = schema["properties"]["capabilities"]["items"]
         self.assertIn("implementation_modules", capability_schema["required"])
+        self.assertIn("importance", capability_schema["required"])
         self.assertIn("user_goal", capability_schema["required"])
+        self.assertIn("module_dispositions", schema["required"])
+        self.assertIn("逐个交代", full_prompt)
+
+    def test_inventory_scope_rejects_unreviewed_product_modules(self) -> None:
+        packet = {
+            "scope": {
+                "allowed_source_paths": [
+                    "src/pipecat/cli/main.py",
+                    "src/pipecat/pipeline/pipeline.py",
+                    "src/pipecat/transports/base.py",
+                ],
+                "feature_ids": ["feature_cli"],
+                "evidence_ids": ["evidence_cli"],
+                "module_paths": [
+                    "src/pipecat/cli",
+                    "src/pipecat/pipeline",
+                    "src/pipecat/transports",
+                ],
+                "required_product_module_paths": [
+                    "src/pipecat/cli",
+                    "src/pipecat/pipeline",
+                    "src/pipecat/transports",
+                ],
+                "require_module_coverage": True,
+            }
+        }
+        payload = {
+            "capabilities": [
+                {
+                    "id": "cli-only",
+                    "implementation_modules": [
+                        {
+                            "path": "src/pipecat/cli",
+                            "classification": "core",
+                        }
+                    ],
+                    "source_feature_ids": ["feature_cli"],
+                    "evidence_ids": ["evidence_cli"],
+                    "source_refs": [
+                        {"path": "src/pipecat/cli/main.py"}
+                    ],
+                }
+            ],
+            "module_dispositions": [
+                {
+                    "path": "src/pipecat/cli",
+                    "disposition": "supporting",
+                    "capability_ids": ["cli-only"],
+                    "reason": "命令入口只负责启动。",
+                }
+            ],
+        }
+
+        with self.assertRaisesRegex(ValueError, "unreviewed product modules"):
+            _require_inventory_scope(payload, packet)
+
+        payload["module_dispositions"].extend(
+            [
+                {
+                    "path": "src/pipecat/pipeline",
+                    "disposition": "core-capability",
+                    "capability_ids": ["cli-only"],
+                    "reason": "执行处理器链。",
+                },
+                {
+                    "path": "src/pipecat/transports",
+                    "disposition": "core-capability",
+                    "capability_ids": ["cli-only"],
+                    "reason": "承接实时媒体输入输出。",
+                },
+            ]
+        )
+        _require_inventory_scope(payload, packet)
+
+    def test_inventory_canonicalization_preserves_module_dispositions(self) -> None:
+        packet = {
+            "scope": {
+                "allowed_source_paths": ["src/pipeline.py"],
+                "module_paths": ["src"],
+            },
+            "feature_hints": [
+                {
+                    "id": "feature_pipeline",
+                    "evidence_ids": ["evidence_pipeline"],
+                    "steps": [{"path": "src/pipeline.py"}],
+                }
+            ],
+            "evidence": [
+                {
+                    "id": "evidence_pipeline",
+                    "kind": "graph-navigation-slice",
+                    "path": "src/pipeline.py",
+                    "line_start": 1,
+                    "line_end": 8,
+                }
+            ],
+        }
+        payload = {
+            "capabilities": [
+                {
+                    "id": "pipeline",
+                    "implementation_modules": [
+                        {
+                            "path": "src",
+                            "classification": "core",
+                            "responsibility": "运行帧管线",
+                            "handoff": "把帧交给下游处理器",
+                        }
+                    ],
+                    "source_refs": [
+                        {
+                            "path": "src/pipeline.py",
+                            "line_start": 1,
+                            "line_end": 8,
+                        }
+                    ],
+                }
+            ],
+            "module_dispositions": [
+                {
+                    "path": "src",
+                    "disposition": "core-capability",
+                    "capability_ids": [],
+                    "reason": "核心运行时。",
+                }
+            ],
+        }
+
+        result = _canonicalize_inventory_payload(payload, packet)
+
+        self.assertEqual(
+            result["module_dispositions"][0]["capability_ids"], ["pipeline"]
+        )
+        self.assertEqual(result["capabilities"][0]["id"], "pipeline")
 
     def test_global_business_inventory_keeps_modules_as_topology_not_model_shards(
         self,
@@ -130,6 +267,8 @@ class CliTest(unittest.TestCase):
                 {"path": "src/pipeline/run.py", "order": 1},
                 {"path": "src/transport/ws.py", "order": 2},
                 {"path": "tests/test_health.py", "order": 3},
+                {"path": ".claude/skills/review/SKILL.md", "order": 4},
+                {"path": "changelog/2026.md", "order": 5},
             ],
             "feature_hints": [
                 {
@@ -156,11 +295,36 @@ class CliTest(unittest.TestCase):
                         }
                     ],
                 },
+                {
+                    "id": "feature_agent_instruction",
+                    "evidence_ids": ["evidence_agent_instruction"],
+                    "steps": [
+                        {
+                            "path": ".claude/skills/review/SKILL.md",
+                            "evidence_ids": ["evidence_agent_instruction"],
+                        }
+                    ],
+                },
+                {
+                    "id": "feature_changelog",
+                    "evidence_ids": ["evidence_changelog"],
+                    "steps": [
+                        {
+                            "path": "changelog/2026.md",
+                            "evidence_ids": ["evidence_changelog"],
+                        }
+                    ],
+                },
             ],
             "evidence": [
                 {"id": "evidence_pipeline", "path": "src/pipeline/run.py"},
                 {"id": "evidence_transport", "path": "src/transport/ws.py"},
                 {"id": "evidence_health", "path": "tests/test_health.py"},
+                {
+                    "id": "evidence_agent_instruction",
+                    "path": ".claude/skills/review/SKILL.md",
+                },
+                {"id": "evidence_changelog", "path": "changelog/2026.md"},
             ],
             "capability_graph": {
                 "schema_version": "repo-teacher-capability-graph/v1",
@@ -203,9 +367,18 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual(
             [item["path"] for item in result["modules"]],
-            ["src/pipeline", "src/transport", "tests"],
+            [
+                "src/pipeline",
+                "src/transport",
+                ".claude/skills/review",
+                "changelog",
+                "tests",
+            ],
         )
-        self.assertEqual(result["modules"][-1]["category"], "testing")
+        self.assertEqual(
+            [item["category"] for item in result["modules"][-3:]],
+            ["engineering-support", "documentation", "testing"],
+        )
         self.assertEqual(
             [item["id"] for item in result["feature_hints"]],
             ["feature_pipeline"],
@@ -217,6 +390,10 @@ class CliTest(unittest.TestCase):
         self.assertIn("src/pipeline/run.py", result["scope"]["allowed_source_paths"])
         self.assertIn("src/transport/ws.py", result["scope"]["allowed_source_paths"])
         self.assertNotIn("tests/test_health.py", result["scope"]["allowed_source_paths"])
+        self.assertEqual(
+            result["scope"]["required_product_module_paths"],
+            ["src/pipeline", "src/transport"],
+        )
         self.assertEqual(
             result["inventory_strategy"]["decision_scope"],
             "whole-repository-business-capabilities",

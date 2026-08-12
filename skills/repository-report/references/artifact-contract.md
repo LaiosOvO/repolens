@@ -26,6 +26,9 @@
 - `interaction`：触发者、接管者、输入、步骤、分支、输出、消费者和结束条件；
 - `state_flow`：每步读取、写入、下一步决策者；
 - `mechanism`：存储/查询、循环、并发、等待、路由、失败与恢复；
+- `execution_narrative`：入口输入、字段/状态决策、核心转换、状态提交、下游唤醒、终止返回的自然语言因果链；
+- `rule_matrix`：候选生成、合法性校验、选择/路由、调度/并发、停止、失败/恢复；逐项区分 Prompt/模型规则与宿主代码硬规则；
+- `alternatives`：至少两种同类框架/范式的控制权、动态时机、路由、持久化、恢复与适用边界，并附官方来源；
 - `difficulties`：不变量、天真实现、失败表现、当前取舍；
 - `reuse`：可直接借鉴、必须改造、不要照搬、仍需验证；
 - `source_refs`：canonical paths/lines/evidence IDs/relationship IDs。

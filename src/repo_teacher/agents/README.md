@@ -37,6 +37,6 @@ Prompt 的具体任务措辞放在 `repo_teacher/prompts/*.md`；JSON 结构放�
 - 项目概览 Schema：`project_overview_json_schema()`
 - 章节批次 Schema：`chapter_batch_json_schema()`
 - 完整公开 Schema：`repo_teacher/schemas/capability-inventory-v1.schema.json`
-- Good/Bad Cases：`skills/repository-report/references/capability-inventory-*.json`
+- Good/Bad Cases：`tests/fixtures/capability-inventory/capability-inventory-*.json`
 
 任何 Agent 文档示例与这些 Schema 不一致都属于发布阻断，而不是文档小问题。

@@ -13,7 +13,7 @@ class ApprovedInventoryTest(unittest.TestCase):
     def _write_inventory(self, root: Path, *, status: str) -> Path:
         fixture = (
             Path(__file__).parents[1]
-            / "skills/repository-report/references/capability-inventory-good.json"
+            / "tests/fixtures/capability-inventory/capability-inventory-good.json"
         )
         inventory = json.loads(fixture.read_text(encoding="utf-8"))
         path = root / "capability-inventory.json"

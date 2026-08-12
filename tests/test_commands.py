@@ -34,7 +34,7 @@ class InventoryCommandTest(unittest.TestCase):
             payload = json.loads(
                 (
                     Path(__file__).parents[1]
-                    / "skills/repository-report/references/capability-inventory-good.json"
+                    / "tests/fixtures/capability-inventory/capability-inventory-good.json"
                 ).read_text(encoding="utf-8")
             )
             capability_ids = [item["id"] for item in payload["capabilities"]]
@@ -123,7 +123,7 @@ class InventoryCommandTest(unittest.TestCase):
             workspace.mkdir()
             fixture = (
                 Path(__file__).parents[1]
-                / "skills/repository-report/references/capability-inventory-good.json"
+                / "tests/fixtures/capability-inventory/capability-inventory-good.json"
             )
             payload = json.loads(fixture.read_text(encoding="utf-8"))
             capability_ids = [item["id"] for item in payload["capabilities"]]
@@ -196,7 +196,7 @@ class InventoryCommandTest(unittest.TestCase):
             workspace.mkdir()
             fixture = (
                 Path(__file__).parents[1]
-                / "skills/repository-report/references/capability-inventory-good.json"
+                / "tests/fixtures/capability-inventory/capability-inventory-good.json"
             )
             payload = json.loads(fixture.read_text(encoding="utf-8"))
             ports = InventoryCommandPorts(
@@ -233,7 +233,7 @@ class ReportCommandHelpersTest(unittest.TestCase):
             payload = json.loads(
                 (
                     Path(__file__).parents[1]
-                    / "skills/repository-report/references/capability-inventory-good.json"
+                    / "tests/fixtures/capability-inventory/capability-inventory-good.json"
                 ).read_text(encoding="utf-8")
             )
             inventory_text = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"

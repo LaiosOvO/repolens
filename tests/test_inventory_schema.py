@@ -16,15 +16,10 @@ class InventorySchemaTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.root = Path(__file__).parents[1]
-        cls.good_path = (
-            cls.root
-            / "skills/repository-report/references/capability-inventory-good.json"
-        )
+        cls.fixture_root = cls.root / "tests/fixtures/capability-inventory"
+        cls.good_path = cls.fixture_root / "capability-inventory-good.json"
         cls.good = json.loads(cls.good_path.read_text(encoding="utf-8"))
-        cls.bad_health_path = (
-            cls.root
-            / "skills/repository-report/references/capability-inventory-bad-health-route.json"
-        )
+        cls.bad_health_path = cls.fixture_root / "capability-inventory-bad-health-route.json"
         cls.bad_health = json.loads(
             cls.bad_health_path.read_text(encoding="utf-8")
         )
@@ -45,14 +40,13 @@ class InventorySchemaTest(unittest.TestCase):
     def test_complete_health_route_bad_case_reaches_semantic_gate(self) -> None:
         inventory = json.loads(
             (
-                self.root
-                / "skills/repository-report/references/capability-inventory-bad-health-route.json"
+                self.fixture_root / "capability-inventory-bad-health-route.json"
             ).read_text(encoding="utf-8")
         )
         review = json.loads(
             (
-                self.root
-                / "skills/repository-report/references/capability-inventory-bad-health-route.validation.json"
+                self.fixture_root
+                / "capability-inventory-bad-health-route.validation.json"
             ).read_text(encoding="utf-8")
         )
 

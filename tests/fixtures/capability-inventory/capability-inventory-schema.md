@@ -1,4 +1,6 @@
-# `capability-inventory.json` 合同
+# RepoLens 产品 CLI 的 `capability-inventory.json` 测试合同
+
+本文件是产品 CLI 的测试 fixture，不属于 `repository-report` 纯 Skill 的执行合同。
 
 ## 两个 Schema 层次
 

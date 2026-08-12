@@ -74,6 +74,19 @@ Repo Teacher 会依次从 `REPO_TEACHER_OPENCODE_BIN`、当前 `PATH`、`~/.loca
 
 ## 直接使用 CLI
 
+### 推荐：纯 Skill Markdown-first 流水线
+
+在 Codex、Claude Code 或 OpenCode 中直接调用 `$repository-report`，并提供源码与输出目录：
+
+```text
+使用 $repository-report
+SOURCE=/absolute/path/to/repository
+OUTPUT=/absolute/path/to/report
+STAGE=all
+```
+
+只先检查功能覆盖时把 `STAGE` 改为 `capabilities`。Skill 由当前 agent 本体顺序生成阶段 Markdown 和 `index.html`，不调用 RepoLens 产品程序、渲染器或辅助脚本；CodeGraph 只用于源码关系取证。完整合同见 [`skills/repository-report/SKILL.md`](skills/repository-report/SKILL.md)。
+
 需要单独检查功能清单时，可只运行 inventory：
 
 ```bash

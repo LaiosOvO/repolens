@@ -54,6 +54,29 @@ Repo Teacher 会依次从 `REPO_TEACHER_OPENCODE_BIN`、当前 `PATH`、`~/.loca
 
 ## 直接使用 CLI
 
+### 推荐：纯 Skill 分阶段内容流水线
+
+在 Codex、Claude Code 或 OpenCode 中输入：
+
+```text
+使用 $repository-report
+SOURCE=/absolute/path/to/repository
+OUTPUT=/absolute/path/to/report
+STAGE=all
+```
+
+只验证功能目录时使用 `STAGE=capabilities`。主要中间产物是：
+
+- `stages/00-context.md`：产品资料、目录与三路 CodeGraph 事实；
+- `stages/01-project.md`：项目定位、核心概念与用户旅程；
+- `stages/02-capabilities.md`：不限数量的核心业务功能与五类覆盖账本；
+- `stages/03-implementation/*.evidence.md`：每功能独立调用链证据；
+- `stages/03-implementation/*.md`：当前 Coding CLI agent 对每功能的运行机制解释；
+- `stages/04-engineering.md`：前后端、Worker、数据、部署与工程目录；
+- `stages/05-report.md`、`index.html`、`performance.json`。
+
+该工作流不调用 RepoLens 产品程序、渲染器或辅助脚本。阶段失败时不会循环改写内容；已有阶段只有在源码身份与输入仍匹配时才复用。
+
 需要单独查看功能清单时：
 
 ```bash

@@ -1,0 +1,4 @@
+interface:
+  display_name: 仓库业务功能报告
+  short_description: 生成用于技术选型的源码证据报告
+  default_prompt: 运行 RepoLens 分阶段流水线。先生成并展示业务功能目录，等待我确认后，再生成讲清交互、机制、难点和源码证据的人类可读 HTML。

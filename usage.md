@@ -1,6 +1,15 @@
-# Repo Teacher 使用说明
+# RepoLens 使用说明
 
-Repo Teacher 是一个本地代码仓库教学报告生成器。它先建立文件、符号与依赖图，再由模型把源码证据归纳成“项目定位 → 产品主轴 → 业务功能 → 端到端交互 → 底层机制 → 难点与取舍 → 工程结构 → 源码证据”，最终为每个仓库生成一个主要给人阅读的 `index.html`。
+RepoLens（CLI 命令为 `repo-teacher`）是一个本地代码仓库教学报告生成器。它先建立文件、符号与依赖图，再由模型把源码证据归纳成“项目定位 → 产品主轴 → 业务功能 → 端到端交互 → 底层机制 → 难点与取舍 → 工程结构 → 源码证据”，最终为每个仓库生成一个主要给人阅读的 `index.html`。
+
+正常使用只需执行一次 `report`。它严格顺序运行五个固定阶段：固定源码、CodeGraph/AST
+索引、一次生成完整内容、证据校验、原子发布。每阶段都有缓存和耗时记录；失败不会自动回跳
+或反复调用模型，修好原因后再次执行会复用输入身份未变化的通过阶段。
+
+实现中 `cli.py` 只解析参数并装配命令；中文 Agent 合同在
+`src/repo_teacher/agents/`，版本化 Prompt 在 `src/repo_teacher/prompts/`，
+JSON Schema 在 `src/repo_teacher/schemas/`，Codex/OpenCode/DeepSeek 的传输、
+超时与 JSON 解码在 `src/repo_teacher/providers/`。这些边界由架构测试锁定。
 
 它不会把 `main`、路由、健康检查、数据库迁移、example 或 UI primitive 直接当成一级产品功能。example 会保留在对应业务功能的“仓库已有场景”和源码证据中。
 
@@ -26,7 +35,7 @@ cd /Volumes/T7/workspace/ontology/graph/dev/repo
 3. 报告名称；结果写到 `<输出根目录>/<报告名称>/index.html`。
 4. 执行后端：Codex 或 OpenCode。
 5. OpenCode 模式下选择 DeepSeek Flash 或 Pro，并输入 OpenRouter API Key。
-6. 点击“开始生成报告”，右侧实时显示六阶段进度和日志。
+6. 点击“开始生成报告”，右侧实时显示五个固定阶段、耗时、失败原因和日志。
 
 API Key 仅注入本次 OpenCode 子进程的环境变量，不进入命令行参数、任务 JSON、日志、HTML 或本地配置文件。也可以在启动界面前设置 `OPENROUTER_API_KEY`，这样界面无需填写。
 
@@ -41,11 +50,30 @@ nvm use 22
 opencode --version
 ```
 
-Repo Teacher 会依次从 `REPO_TEACHER_OPENCODE_BIN`、当前 `PATH`、`~/.local/bin` 和 NVM 版本目录寻找 OpenCode。
+Repo Teacher 会依次从 `REPO_TEACHER_OPENCODE_BIN`、当前 `PATH`、`~/.local/bin` 和 NVM 版本目录寻找 OpenCode。JS 语法校验所需的 Node 会从 `REPO_TEACHER_NODE`、`NVM_BIN`、`PATH` 或登录 shell 自动发现，所以后台和非交互 CLI 也能使用外接硬盘中的 NVM。
 
 ## 直接使用 CLI
 
-Codex：
+需要单独查看功能清单时：
+
+```bash
+.venv/bin/repo-teacher inventory \
+  /absolute/path/to/repository \
+  --output /absolute/path/to/capability-inventory.json \
+  --provider codex
+```
+
+已有审核清单时可以复用：
+
+```bash
+.venv/bin/repo-teacher report \
+  /absolute/path/to/repository \
+  --output /absolute/path/to/reports/project-name \
+  --inventory /absolute/path/to/capability-inventory.json \
+  --provider codex
+```
+
+Codex 全自动生产流程：
 
 ```bash
 .venv/bin/repo-teacher report \
@@ -88,5 +116,17 @@ DeepSeek Pro 使用 `openrouter/deepseek/deepseek-v4-pro`。
 - `current/human-report.json`：模型生成的业务功能与教程结构。
 - `current/capability-graph.json`：代码图和功能切片。
 - `current/analysis-pack.json`：有界证据包。
+- `current/source-manifest.json`：源码身份与闭包。
+- `current/approval.json`：仅在显式传入 `--inventory` 时生成。
+- `current/chapters/*.json`：逐章结构化内容。
+- `current/chapter-validation/*.json`：逐章证据和叙述合同检查。
+- `.<报告名>.pipeline/stages/01-*.json` 至 `05-*.json`：固定阶段状态与输入输出 digest。
+- `.<报告名>.pipeline/stages/pipeline.json`：Pipeline 当前阶段和最终状态。
+- `<报告名>.performance.json`：五阶段 wall time、模型调用次数与最长阶段；界面读取同一合同。
+
+`inventory` 会在功能清单旁发布 `.validation.json`、`.run-manifest.json` 和
+`.performance.json`。
+第 04 阶段用确定性 Schema、路径、行号和证据闭包验证第 03 阶段的一次输出；失败时不发布，
+也不触发隐式语义返修。
 
 根目录入口和 `current/` 由同一 generation 发布；不要手工修改生成文件。

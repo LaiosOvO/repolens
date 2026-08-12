@@ -1209,8 +1209,14 @@ def build_index(
     deadline_seconds: float | None = 120.0,
     cancelled: Callable[[], bool] | None = None,
     previous_index: dict[str, Any] | None = None,
+    baseline_project_root: Path | None = None,
 ) -> dict[str, Any]:
     root = path.expanduser().resolve()
+    baseline_root = (
+        baseline_project_root.expanduser().resolve()
+        if baseline_project_root is not None
+        else root
+    )
     resolved_output = output_dir.expanduser().resolve() if output_dir else None
     if resolved_output is not None and (
         resolved_output == root or root.is_relative_to(resolved_output)
@@ -1252,7 +1258,7 @@ def build_index(
         if rejection_reason is None:
             rejection_reason = _baseline_rejection_reason(
                 previous_index,
-                root=root,
+                root=baseline_root,
                 analysis_fingerprint=analysis_fingerprint,
                 current_scan=scan,
             )

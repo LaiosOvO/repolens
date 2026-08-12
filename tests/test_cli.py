@@ -3,12 +3,24 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
 from repo_teacher.cli import (
+    _rebind_reviewed_narrative,
+    main,
+)
+from repo_teacher.pipeline.codegraph import (
+    _bounded_explore_text,
+    _codegraph_domain_context,
+    _codegraph_explore_domain,
+    _prepare_codegraph,
+)
+from repo_teacher.pipeline.synthesis import (
     _build_chapter_batch_pack,
     _build_global_business_inventory_pack,
     _build_inventory_shard_pack,
@@ -17,6 +29,7 @@ from repo_teacher.cli import (
     _decode_json_object,
     _inventory_from_manifest,
     _inventory_json_schema,
+    _inventory_module_shards,
     _inventory_prompt,
     _inventory_shard_prompt,
     _chapter_batch_prompt,
@@ -24,16 +37,158 @@ from repo_teacher.cli import (
     _require_inventory_scope,
     _add_project_navigation,
     _model_prompt,
+    _merge_inventory_shards,
     _normalize_project_overview,
     _group_inventory_for_humans,
     _remaining_model_timeout,
-    _rebind_reviewed_narrative,
-    main,
 )
 from repo_teacher.indexer import _integrity_digest
+from repo_teacher.pipeline.linear_pipeline import LINEAR_REPORT_STAGES
+from repo_teacher.persistence import GenerationPublisher
 
 
 class CliTest(unittest.TestCase):
+    def test_inventory_command_stops_after_business_capability_list(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source"
+            source.mkdir()
+            output = Path(directory) / "capability-inventory.json"
+            with patch("repo_teacher.cli._inventory", return_value=0) as discover:
+                result = main(
+                    [
+                        "inventory",
+                        str(source),
+                        "--output",
+                        str(output),
+                        "--provider",
+                        "codex",
+                    ]
+                )
+
+        self.assertEqual(result, 0)
+        discover.assert_called_once_with(
+            str(source), str(output), 900, "codex", 1_000_000
+        )
+
+    def test_report_prepares_codegraph_with_init_then_sync(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            with (
+                patch("repo_teacher.pipeline.codegraph._find_codegraph", return_value="/bin/codegraph"),
+                patch("repo_teacher.pipeline.codegraph.subprocess.run") as run,
+            ):
+                run.return_value.returncode = 0
+                run.return_value.stdout = "indexed"
+                run.return_value.stderr = ""
+
+                self.assertEqual(_prepare_codegraph(source), "init")
+                init_command = run.call_args.args[0]
+                self.assertEqual(init_command, ["/bin/codegraph", "init", str(source)])
+
+                (source / ".codegraph").mkdir()
+                (source / ".codegraph" / "codegraph.db").write_bytes(b"index")
+                self.assertEqual(_prepare_codegraph(source), "sync")
+                sync_command = run.call_args.args[0]
+                self.assertEqual(sync_command, ["/bin/codegraph", "sync", str(source)])
+
+    def test_business_domain_reads_codegraph_relationships_before_model_synthesis(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            with (
+                patch("repo_teacher.pipeline.codegraph._find_codegraph", return_value="/bin/codegraph"),
+                patch("repo_teacher.pipeline.codegraph.subprocess.run") as run,
+            ):
+                run.return_value.returncode = 0
+                run.return_value.stdout = "call path: submit -> claim -> execute"
+                run.return_value.stderr = ""
+
+                result = _codegraph_explore_domain(
+                    source,
+                    ["backend/internal/service", "backend/internal/store"],
+                )
+
+        self.assertIn("submit -> claim -> execute", result)
+        command = run.call_args.args[0]
+        self.assertEqual(command[:2], ["/bin/codegraph", "explore"])
+        self.assertIn("--max-files", command)
+        self.assertIn("backend/internal/service", command[-1])
+
+    def test_codegraph_explore_truncation_is_byte_bounded_and_visible(self) -> None:
+        bounded = _bounded_explore_text("语音链路" * 50_000)
+
+        self.assertLessEqual(len(bounded.encode("utf-8")), 100_000)
+        self.assertIn("超过证据包预算", bounded)
+
+    def test_codegraph_domain_context_selects_graph_connected_product_sources(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            database = source / ".codegraph" / "codegraph.db"
+            database.parent.mkdir()
+            with closing(sqlite3.connect(database)) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE nodes (
+                        id TEXT PRIMARY KEY, kind TEXT, name TEXT,
+                        qualified_name TEXT, file_path TEXT, language TEXT,
+                        start_line INTEGER, end_line INTEGER
+                    );
+                    CREATE TABLE edges (
+                        id INTEGER PRIMARY KEY, source TEXT, target TEXT,
+                        kind TEXT, line INTEGER
+                    );
+                    """
+                )
+                connection.executemany(
+                    "INSERT INTO nodes VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        (
+                            "submit",
+                            "function",
+                            "Submit",
+                            "service.Submit",
+                            "backend/service/tasks.go",
+                            "go",
+                            10,
+                            20,
+                        ),
+                        (
+                            "claim",
+                            "function",
+                            "Claim",
+                            "worker.Claim",
+                            "backend/worker/runner.go",
+                            "go",
+                            30,
+                            40,
+                        ),
+                        (
+                            "unrelated",
+                            "function",
+                            "Render",
+                            "frontend.Render",
+                            "frontend/app.ts",
+                            "typescript",
+                            1,
+                            2,
+                        ),
+                    ],
+                )
+                connection.execute(
+                    "INSERT INTO edges VALUES (?, ?, ?, ?, ?)",
+                    (1, "submit", "claim", "calls", 18),
+                )
+                connection.commit()
+
+            context = _codegraph_domain_context(source, ["backend"])
+
+        self.assertEqual(
+            context["source_paths"],
+            ["backend/service/tasks.go", "backend/worker/runner.go"],
+        )
+        self.assertEqual(len(context["edges"]), 1)
+        self.assertEqual(context["edges"][0]["source"], "service.Submit")
+        self.assertEqual(context["edges"][0]["target"], "worker.Claim")
+
     def test_project_overview_drops_a_duplicated_all_supporting_axis(self) -> None:
         source_ref = {"path": "src/app.py", "line_start": 1, "line_end": 1, "claim": "evidence"}
         overview = {
@@ -96,9 +251,24 @@ class CliTest(unittest.TestCase):
                         {"path": "server/app.py", "line_start": 10, "line_end": 11}
                     ],
                 },
-            ]
+            ],
+            "module_dispositions": [
+                {
+                    "path": "server",
+                    "disposition": "core-capability",
+                    "capability_ids": ["voice-session", "healthz"],
+                    "reason": "承载语音会话及其存活探针。",
+                }
+            ],
         }
         grouped = {
+            "project_summary": {
+                "product_type": "实时语音 Agent 服务",
+                "primary_actor": "手机用户",
+                "primary_outcome": "通过手机与桌面 Agent 完成语音交互",
+                "main_runtime": "手机音频与桌面 Agent 之间的实时会话",
+                "not_the_product": ["健康检查", "静态根页面"],
+            },
             "groups": [
                 {
                     "id": "voice-session",
@@ -122,8 +292,8 @@ class CliTest(unittest.TestCase):
 
         with (
             tempfile.TemporaryDirectory() as directory,
-            patch("repo_teacher.cli._run_codex_json", return_value=grouped),
-            patch("repo_teacher.cli.time.monotonic", return_value=0.0),
+            patch("repo_teacher.pipeline.grouping.run_structured_json", return_value=grouped),
+            patch("repo_teacher.pipeline.timeouts.time.monotonic", return_value=0.0),
         ):
             result = _group_inventory_for_humans(
                 payload,
@@ -138,6 +308,9 @@ class CliTest(unittest.TestCase):
         )
         self.assertIn("手机音频进入 Agent", result["capabilities"][0]["plain_summary"])
         self.assertNotIn("server/voice.py", result["capabilities"][0]["title"])
+        self.assertEqual(
+            result["module_dispositions"][0]["capability_ids"], ["voice-session"]
+        )
 
     def test_inventory_prompts_do_not_promote_supporting_surfaces(self) -> None:
         full_prompt = _inventory_prompt(Path("/tmp/pack.json"), Path("/tmp/source"))
@@ -148,7 +321,14 @@ class CliTest(unittest.TestCase):
             self.assertIn("健康/就绪探针", prompt)
             self.assertIn("不得独立输出", prompt)
             self.assertIn("用户目标", prompt)
+            self.assertIn("登录、会话工作台", prompt)
+            self.assertRegex(
+                prompt,
+                r"(不构成合并理由|不能证明它们属于同一能力)",
+            )
+            self.assertIn("禁止用关键词或正则", prompt)
         schema = _inventory_json_schema()
+        self.assertIn("project_summary", schema["required"])
         self.assertIn("capabilities", schema["properties"])
         capability_schema = schema["properties"]["capabilities"]["items"]
         self.assertIn("implementation_modules", capability_schema["required"])
@@ -156,6 +336,323 @@ class CliTest(unittest.TestCase):
         self.assertIn("user_goal", capability_schema["required"])
         self.assertIn("module_dispositions", schema["required"])
         self.assertIn("逐个交代", full_prompt)
+
+    def test_business_domain_shards_are_bounded_and_follow_product_topology(self) -> None:
+        feature_hints = [
+            {
+                "id": f"feature_{position}",
+                "evidence_ids": [f"evidence_{position}"],
+                "steps": [
+                    {
+                        "path": f"packages/product-{position}/src/runtime.py",
+                        "evidence_ids": [f"evidence_{position}"],
+                    }
+                ],
+            }
+            for position in range(10)
+        ]
+        pack = {
+            "feature_hints": feature_hints,
+            "evidence": [
+                {
+                    "id": f"evidence_{position}",
+                    "path": f"packages/product-{position}/src/runtime.py",
+                }
+                for position in range(10)
+            ],
+            "capability_graph": {
+                "feature_slices": [],
+                "capability_candidates": [],
+                "mechanism_clusters": [],
+                "components": [],
+                "module_dependencies": [],
+            },
+        }
+
+        shards = _inventory_module_shards(pack)
+
+        self.assertEqual(len(shards), 6)
+        flattened = {path for shard in shards for path in shard}
+        self.assertEqual(
+            flattened,
+            {f"packages/product-{position}" for position in range(10)},
+        )
+
+    def test_business_domain_shards_exclude_generated_and_reverse_engineering_copies(self) -> None:
+        paths = [
+            "backend/internal/service/agent_task_worker.go",
+            "frontend/apps/agent/src/page.tsx",
+            "artifacts/tasks/session-1/result.json",
+            "reverse-source/unpacked/static/chunk.js",
+            "frontend/assets/demo/video.ts",
+        ]
+        pack = {
+            "feature_hints": [
+                {
+                    "id": f"feature_{position}",
+                    "evidence_ids": [f"evidence_{position}"],
+                    "steps": [
+                        {"path": path, "evidence_ids": [f"evidence_{position}"]}
+                    ],
+                }
+                for position, path in enumerate(paths)
+            ],
+            "evidence": [
+                {"id": f"evidence_{position}", "path": path}
+                for position, path in enumerate(paths)
+            ],
+            "capability_graph": {
+                "feature_slices": [],
+                "capability_candidates": [],
+                "mechanism_clusters": [],
+                "components": [],
+                "module_dependencies": [],
+            },
+        }
+
+        shards = _inventory_module_shards(pack)
+
+        flattened = {path for shard in shards for path in shard}
+        self.assertIn("backend/internal/service", flattened)
+        self.assertIn("frontend/apps/agent", flattened)
+        self.assertFalse(any(path.startswith("artifacts/") for path in flattened))
+        self.assertFalse(any(path.startswith("reverse-source/") for path in flattened))
+        self.assertFalse(any("/assets/" in f"/{path}/" for path in flattened))
+
+    def test_business_domain_packet_uses_graph_plus_bounded_module_fallback(self) -> None:
+        feature_hints = []
+        evidence = []
+        for package in ("a", "b"):
+            for position in range(80):
+                identifier = f"{package}_{position}"
+                path = f"packages/{package}/src/feature_{position}.py"
+                feature_hints.append(
+                    {
+                        "id": f"feature_{identifier}",
+                        "evidence_ids": [f"evidence_{identifier}"],
+                        "steps": [
+                            {
+                                "path": path,
+                                "evidence_ids": [f"evidence_{identifier}"],
+                            }
+                        ],
+                    }
+                )
+                evidence.append(
+                    {"id": f"evidence_{identifier}", "path": path}
+                )
+        packet = _build_inventory_shard_pack(
+            {
+                "feature_hints": feature_hints,
+                "evidence": evidence,
+                "capability_graph": {
+                    "feature_slices": [],
+                    "capability_candidates": [],
+                    "mechanism_clusters": [],
+                    "components": [],
+                    "module_dependencies": [],
+                },
+            },
+            ["packages/a", "packages/b"],
+        )
+
+        self.assertLessEqual(len(packet["feature_hints"]), 48)
+        self.assertGreater(packet["scope"]["selection"]["truncated_hints"], 0)
+        selected_paths = {
+            step["path"]
+            for hint in packet["feature_hints"]
+            for step in hint["steps"]
+        }
+        self.assertTrue(any(path.startswith("packages/a/") for path in selected_paths))
+        self.assertTrue(any(path.startswith("packages/b/") for path in selected_paths))
+
+    def test_business_domain_packet_materializes_codegraph_sources_without_route_hints(self) -> None:
+        packet = _build_inventory_shard_pack(
+            {
+                "feature_hints": [],
+                "evidence": [],
+                "capability_graph": {
+                    "feature_slices": [],
+                    "capability_candidates": [],
+                    "mechanism_clusters": [],
+                    "components": [],
+                    "module_dependencies": [],
+                },
+            },
+            ["backend"],
+            codegraph_context={
+                "source_paths": [
+                    "backend/service/agent_tasks.go",
+                    "backend/worker/agent_task_worker.go",
+                ],
+                "nodes": [],
+                "edges": [],
+            },
+        )
+
+        self.assertEqual(
+            packet["scope"]["allowed_source_paths"],
+            [
+                "backend/service/agent_tasks.go",
+                "backend/worker/agent_task_worker.go",
+            ],
+        )
+        self.assertEqual(
+            packet["codegraph_context"]["source_paths"],
+            packet["scope"]["allowed_source_paths"],
+        )
+
+    def test_inventory_shards_merge_without_losing_independent_business_actions(self) -> None:
+        shard_results = [
+            (
+                "backend",
+                {
+                    "capabilities": [
+                        {
+                            "id": "agent-task",
+                            "title": "数字员工任务执行",
+                            "implementation_modules": [
+                                {
+                                    "path": "backend/agent",
+                                    "classification": "core",
+                                    "responsibility": "认领任务",
+                                    "handoff": "把事件交给前端",
+                                }
+                            ],
+                        }
+                    ],
+                    "module_dispositions": [
+                        {
+                            "path": "backend/agent",
+                            "disposition": "core-capability",
+                            "capability_ids": ["agent-task"],
+                            "reason": "执行任务",
+                        }
+                    ],
+                },
+            ),
+            (
+                "frontend",
+                {
+                    "capabilities": [
+                        {
+                            "id": "agent-task",
+                            "title": "数字员工创建",
+                            "implementation_modules": [
+                                {
+                                    "path": "frontend/agents",
+                                    "classification": "core",
+                                    "responsibility": "收集配置",
+                                    "handoff": "提交给后端",
+                                }
+                            ],
+                        }
+                    ],
+                    "module_dispositions": [
+                        {
+                            "path": "frontend/agents",
+                            "disposition": "core-capability",
+                            "capability_ids": ["agent-task"],
+                            "reason": "创建入口",
+                        }
+                    ],
+                },
+            ),
+        ]
+
+        merged = _merge_inventory_shards(shard_results)
+
+        self.assertEqual(
+            [item["id"] for item in merged["capabilities"]],
+            ["backend--agent-task", "frontend--agent-task"],
+        )
+        self.assertEqual(
+            merged["module_dispositions"][1]["capability_ids"],
+            ["frontend--agent-task"],
+        )
+
+    def test_inventory_shard_collapses_byte_identical_duplicate_objects(self) -> None:
+        capability = {"id": "clock", "title": "单调经过时间读取"}
+        merged = _merge_inventory_shards(
+            [
+                (
+                    "clock-domain",
+                    {
+                        "capabilities": [capability, capability, capability],
+                        "module_dispositions": [
+                            {
+                                "path": "src/clocks",
+                                "disposition": "core-capability",
+                                "capability_ids": ["clock"],
+                                "reason": "提供单调时钟。",
+                            }
+                        ],
+                    },
+                )
+            ]
+        )
+
+        self.assertEqual(
+            [item["id"] for item in merged["capabilities"]],
+            ["clock-domain--clock"],
+        )
+
+    def test_inventory_shard_rejects_conflicting_duplicate_objects(self) -> None:
+        with self.assertRaisesRegex(ValueError, "conflicting duplicate"):
+            _merge_inventory_shards(
+                [
+                    (
+                        "domain",
+                        {
+                            "capabilities": [
+                                {"id": "same", "title": "功能甲"},
+                                {"id": "same", "title": "功能乙"},
+                            ],
+                            "module_dispositions": [],
+                        },
+                    )
+                ]
+            )
+
+    def test_source_scope_shards_fold_back_into_one_module_disposition(self) -> None:
+        merged = _merge_inventory_shards(
+            [
+                (
+                    "domain-00",
+                    {
+                        "capabilities": [{"id": "create"}],
+                        "module_dispositions": [
+                            {
+                                "path": "backend/internal/httpapi",
+                                "disposition": "core-capability",
+                                "capability_ids": ["create"],
+                                "reason": "提交任务",
+                            }
+                        ],
+                    },
+                ),
+                (
+                    "domain-01",
+                    {
+                        "capabilities": [{"id": "execute"}],
+                        "module_dispositions": [
+                            {
+                                "path": "backend/internal/httpapi",
+                                "disposition": "core-capability",
+                                "capability_ids": ["execute"],
+                                "reason": "回传结果",
+                            }
+                        ],
+                    },
+                ),
+            ]
+        )
+
+        self.assertEqual(len(merged["module_dispositions"]), 1)
+        self.assertEqual(
+            merged["module_dispositions"][0]["capability_ids"],
+            ["domain-00--create", "domain-01--execute"],
+        )
 
     def test_inventory_scope_rejects_unreviewed_product_modules(self) -> None:
         packet = {
@@ -274,7 +771,7 @@ class CliTest(unittest.TestCase):
             ],
             "module_dispositions": [
                 {
-                    "path": "src",
+                    "path": "src/pipeline.py",
                     "disposition": "core-capability",
                     "capability_ids": [],
                     "reason": "核心运行时。",
@@ -287,7 +784,222 @@ class CliTest(unittest.TestCase):
         self.assertEqual(
             result["module_dispositions"][0]["capability_ids"], ["pipeline"]
         )
+        self.assertEqual(result["module_dispositions"][0]["path"], "src")
         self.assertEqual(result["capabilities"][0]["id"], "pipeline")
+
+    def test_inventory_canonicalization_removes_disposition_members_rejected_by_evidence(self) -> None:
+        packet = {
+            "scope": {
+                "allowed_source_paths": ["src/pipeline.py"],
+                "module_paths": ["src"],
+            },
+            "feature_hints": [
+                {
+                    "id": "feature_pipeline",
+                    "evidence_ids": ["evidence_pipeline"],
+                    "steps": [{"path": "src/pipeline.py"}],
+                }
+            ],
+            "evidence": [
+                {
+                    "id": "evidence_pipeline",
+                    "kind": "graph-navigation-slice",
+                    "path": "src/pipeline.py",
+                    "line_start": 1,
+                    "line_end": 8,
+                }
+            ],
+        }
+        payload = {
+            "capabilities": [
+                {
+                    "id": "accepted",
+                    "implementation_modules": [
+                        {
+                            "path": "src",
+                            "classification": "core",
+                            "responsibility": "运行帧管线",
+                            "handoff": "交付结果",
+                        }
+                    ],
+                    "source_refs": [
+                        {
+                            "path": "src/pipeline.py",
+                            "line_start": 1,
+                            "line_end": 8,
+                        }
+                    ],
+                },
+                {
+                    "id": "rejected",
+                    "implementation_modules": [
+                        {
+                            "path": "src",
+                            "classification": "core",
+                            "responsibility": "伪能力",
+                            "handoff": "无",
+                        }
+                    ],
+                    "source_refs": [
+                        {
+                            "path": "outside.py",
+                            "line_start": 1,
+                            "line_end": 2,
+                        }
+                    ],
+                },
+            ],
+            "module_dispositions": [
+                {
+                    "path": "src",
+                    "disposition": "core-capability",
+                    "capability_ids": ["accepted", "rejected"],
+                    "reason": "核心运行时。",
+                }
+            ],
+        }
+
+        result = _canonicalize_inventory_payload(payload, packet)
+
+        self.assertEqual([item["id"] for item in result["capabilities"]], ["accepted"])
+        self.assertEqual(
+            result["module_dispositions"][0]["capability_ids"], ["accepted"]
+        )
+
+    def test_inventory_canonicalization_maps_isolated_slice_paths_to_repository_paths(self) -> None:
+        packet = {
+            "scope": {
+                "allowed_source_paths": ["backend/internal/httpapi/projects.go"],
+                "module_paths": ["backend/internal/httpapi"],
+            },
+            "feature_hints": [
+                {
+                    "id": "feature_projects",
+                    "evidence_ids": ["evidence_projects"],
+                    "steps": [{"path": "backend/internal/httpapi/projects.go"}],
+                }
+            ],
+            "evidence": [
+                {
+                    "id": "evidence_projects",
+                    "kind": "graph-navigation-slice",
+                    "path": "backend/internal/httpapi/projects.go",
+                    "line_start": 10,
+                    "line_end": 30,
+                }
+            ],
+        }
+        payload = {
+            "capabilities": [
+                {
+                    "id": "project_lifecycle",
+                    "source_refs": [
+                        {
+                            "path": (
+                                "/tmp/repolens/domain-04/source-slice/"
+                                "backend/internal/httpapi/projects.go"
+                            ),
+                            "line_start": 10,
+                            "line_end": 30,
+                        }
+                    ],
+                }
+            ]
+        }
+
+        result = _canonicalize_inventory_payload(payload, packet)
+
+        self.assertEqual(
+            result["capabilities"][0]["source_refs"][0]["path"],
+            "backend/internal/httpapi/projects.go",
+        )
+
+    def test_inventory_canonicalization_uses_codegraph_paths_as_feature_facts(self) -> None:
+        packet = {
+            "scope": {
+                "allowed_source_paths": ["src/entry.py", "src/runtime.py"],
+                "module_paths": ["src"],
+            },
+            "feature_hints": [
+                {
+                    "id": "feature_runtime",
+                    "evidence_ids": ["evidence_entry"],
+                    "steps": [{"path": "src/entry.py"}],
+                }
+            ],
+            "evidence": [
+                {
+                    "id": "evidence_runtime",
+                    "kind": "graph-navigation-slice",
+                    "path": "src/runtime.py",
+                    "line_start": 10,
+                    "line_end": 20,
+                }
+            ],
+            "capability_graph": {
+                "feature_slices": [
+                    {
+                        "feature_id": "feature_runtime",
+                        "implementation_nodes": [
+                            {"path": "src/runtime.py", "line": 10}
+                        ],
+                    }
+                ],
+                "capability_candidates": [],
+            },
+        }
+        payload = {
+            "capabilities": [
+                {
+                    "id": "runtime",
+                    "source_refs": [
+                        {
+                            "path": "src/runtime.py",
+                            "line_start": 10,
+                            "line_end": 20,
+                        }
+                    ],
+                }
+            ]
+        }
+
+        result = _canonicalize_inventory_payload(payload, packet)
+
+        self.assertEqual(
+            result["capabilities"][0]["source_feature_ids"],
+            ["feature_runtime"],
+        )
+        self.assertEqual(
+            result["capabilities"][0]["evidence_ids"],
+            ["evidence_runtime"],
+        )
+
+    def test_inventory_canonicalization_does_not_suffix_guess_absolute_paths(self) -> None:
+        packet = {
+            "scope": {
+                "allowed_source_paths": ["src/service.py"],
+                "module_paths": ["src"],
+            },
+            "feature_hints": [],
+            "evidence": [],
+        }
+        payload = {
+            "capabilities": [
+                {
+                    "id": "unsafe",
+                    "source_refs": [
+                        {
+                            "path": "/untrusted/checkout/src/service.py",
+                            "line_start": 1,
+                            "line_end": 2,
+                        }
+                    ],
+                }
+            ]
+        }
+
+        with self.assertRaisesRegex(ValueError, "canonical source closure"):
+            _canonicalize_inventory_payload(payload, packet)
 
     def test_global_business_inventory_keeps_modules_as_topology_not_model_shards(
         self,
@@ -460,14 +1172,41 @@ class CliTest(unittest.TestCase):
         self.assertIn("Realtime voice framework", enriched["product_navigation"][0]["snippet"])
         self.assertEqual(enriched.get("evidence"), None)
 
+    def test_product_navigation_hydrates_index_placeholder_from_source(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory)
+            (source / "AGENTS.md").write_text(
+                "这是一个让用户提交任务并由运行时执行的产品。",
+                encoding="utf-8",
+            )
+            pack = {
+                "project": {"path": str(source)},
+                "files": [{"path": "AGENTS.md"}],
+                "evidence": [
+                    {
+                        "id": "evidence_agents",
+                        "path": "AGENTS.md",
+                        "snippet": "代码图源码锚点",
+                    }
+                ],
+            }
+            enriched = _add_project_navigation(
+                {"scope": {"allowed_source_paths": []}}, pack
+            )
+
+        navigation = enriched["product_navigation"][0]
+        self.assertIn("用户提交任务", navigation["snippet"])
+        self.assertNotIn("代码图源码锚点", navigation["snippet"])
+        self.assertEqual(navigation["confidence"], "navigation-only")
+
     def test_remaining_model_timeout_honors_explicit_budget_above_600_seconds(
         self,
     ) -> None:
-        with patch("repo_teacher.cli.time.monotonic", return_value=100.25):
+        with patch("repo_teacher.pipeline.timeouts.time.monotonic", return_value=100.25):
             self.assertEqual(_remaining_model_timeout(7300.25), 7200)
 
     def test_remaining_model_timeout_rejects_expired_global_deadline(self) -> None:
-        with patch("repo_teacher.cli.time.monotonic", return_value=100.25):
+        with patch("repo_teacher.pipeline.timeouts.time.monotonic", return_value=100.25):
             with self.assertRaisesRegex(TimeoutError, "deadline exceeded"):
                 _remaining_model_timeout(100.25)
 
@@ -761,13 +1500,17 @@ class CliTest(unittest.TestCase):
         )
 
         self.assertIn("数据、控制权与状态", overview_prompt)
-        self.assertIn("语音帧管线把转写交给 Flow", overview_prompt)
-        self.assertIn("客户端怎样持续采集/送帧", overview_prompt)
-        self.assertIn("一键部署", overview_prompt)
+        self.assertIn("跨主轴必须写清控制权与数据的每次交接", overview_prompt)
+        self.assertIn("连续数据或双向交互", overview_prompt)
+        self.assertIn("生成或发布产物", overview_prompt)
         self.assertIn("谁收到什么", chapter_prompt)
-        self.assertIn("媒体帧怎样变成 Flow 的上下文或事件", chapter_prompt)
-        self.assertIn("没有内置固定任务目录", chapter_prompt)
-        self.assertIn("任务怎样排队/持久化", chapter_prompt)
+        self.assertIn("resolved relationships", chapter_prompt)
+        self.assertIn("证据不足", chapter_prompt)
+        self.assertIn("持久化", chapter_prompt)
+        self.assertIn("Activity Diagram", chapter_prompt)
+        self.assertIn(".agents/skills/uml/SKILL.md", chapter_prompt)
+        self.assertIn("节点、连线、箭头和起止点", chapter_prompt)
+        self.assertIn("产品主轴只是分类", overview_prompt)
 
     def test_inventory_schema_does_not_cap_capability_count(self) -> None:
         schema = _inventory_json_schema()
@@ -797,11 +1540,54 @@ class CliTest(unittest.TestCase):
             ) -> dict:
                 feature = pack["feature_hints"][0]
                 evidence_id = pack["evidence"][0]["id"]
+                (_workspace / "human-readability-review.json").write_text(
+                    json.dumps(
+                        {
+                            "status": "passed",
+                            "checks": {
+                                "project_positioning": "passed",
+                                "chapter_coverage": "passed",
+                                "interaction_explainer": "passed",
+                                "implementation_depth": "passed",
+                                "selection_value": "passed",
+                            },
+                            "project_overview_verdict": {
+                                "status": "pass",
+                                "summary": "项目定位与工程结构清晰。",
+                                "missing_answers": [],
+                                "evidence_locations": ["human-report.json#project.overview"],
+                            },
+                            "chapter_verdicts": [
+                                {
+                                    "capability_id": "command-service",
+                                    "status": "pass",
+                                    "one_liner": "命令服务完成一次解析、分派和返回。",
+                                    "thirty_second_restatement": "用户输入命令，解析器验证后交给处理器，处理器返回结果。",
+                                    "checks": {
+                                        "summary_clarity": "passed",
+                                        "interaction_diagram": "passed",
+                                        "implementation_mechanism": "passed",
+                                        "selection_signal": "passed",
+                                    },
+                                    "missing_answers": [],
+                                    "evidence_locations": ["human-report.json#chapters/command-service"],
+                                }
+                            ],
+                            "blocking_issues": [],
+                            "retry_stage": "none",
+                        }
+                    ),
+                    encoding="utf-8",
+                )
                 return {
                     "schema_version": "repo-teacher-human-report/v1",
                     "project": {
                         "commit": pack["project"]["commit"],
                         "analysis_fingerprint": pack["project"]["analysis_fingerprint"],
+                        "overview": {
+                            "one_liner": "一个把命令解析后交给处理器执行的本地命令服务。",
+                            "capability_order": ["command-service"],
+                        },
                     },
                     "generator": {"name": "Codex", "method": "test synthesis"},
                     "chapters": [{
@@ -810,8 +1596,14 @@ class CliTest(unittest.TestCase):
                         "question": "How does one command run?", "use_when": "Local automation.",
                         "distinguish": "A command is a product action, not merely main().",
                         "source_feature_ids": [feature["id"]], "evidence_ids": [evidence_id],
-                        "source_refs": [{"path": "cli.py", "line_start": 1, "line_end": 5,
-                                         "claim": "命令解析器声明并分派 serve。"}],
+                        "source_refs": [
+                            {"path": "cli.py", "line_start": 1, "line_end": 1,
+                             "claim": "命令解析器声明 serve。"},
+                            {"path": "cli.py", "line_start": 2, "line_end": 3,
+                             "claim": "main 负责分派命令。"},
+                            {"path": "cli.py", "line_start": 4, "line_end": 5,
+                             "claim": "处理器返回结果。"},
+                        ],
                         "runtime_story": {"trigger": "User command", "owner": "CLI parser",
                             "output": "Command result", "consumer": "User",
                             "steps": ["Parse", "Dispatch", "Return"]},
@@ -851,20 +1643,510 @@ class CliTest(unittest.TestCase):
                     }],
                 }
 
-            with patch("repo_teacher.cli._synthesize_with_codex", side_effect=narrative):
-                exit_code = main(["report", str(root), "--output", str(output)])
+            with patch("repo_teacher.commands.entrypoints.synthesize_direct_human_report", side_effect=narrative):
+                exit_code = main(
+                    [
+                        "report",
+                        str(root),
+                        "--output",
+                        str(output),
+                        "--auto-inventory",
+                    ]
+                )
 
             self.assertEqual(exit_code, 0)
             self.assertTrue((output / "index.html").is_file())
             self.assertTrue((output / "analysis-pack.json").is_file())
             self.assertTrue((output / "human-report.json").is_file())
             self.assertTrue((output / "capability-graph.json").is_file())
+            pipeline_root = output.with_name(f".{output.name}.pipeline")
+            self.assertTrue((pipeline_root / "stages" / "pipeline.json").is_file())
+            self.assertTrue(
+                output.with_name(f"{output.name}.performance.json").is_file()
+            )
+            self.assertTrue(
+                (pipeline_root / "stages" / "01-source-snapshot.json").is_file()
+            )
+            self.assertTrue(
+                (pipeline_root / "stages" / "05-publication.json").is_file()
+            )
+            published_index = json.loads(
+                (output / "index.json").read_text(encoding="utf-8")
+            )
+            published_pack = json.loads(
+                (output / "analysis-pack.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(published_index["project"]["path"], str(root.resolve()))
+            self.assertEqual(published_pack["project"]["path"], str(root.resolve()))
+            self.assertNotIn(".repo-teacher-snapshots", str(published_index))
+            self.assertNotIn(".repo-teacher-snapshots", str(published_pack))
             visible = (output / "index.html").read_text(encoding="utf-8").split(
                 '<script id="repo-data"', 1
             )[0]
             self.assertIn("Command Service", visible)
             self.assertIn("真正难点与失败方式", visible)
             self.assertNotIn("程序入口：", visible)
+
+            with patch("repo_teacher.commands.entrypoints.synthesize_direct_human_report", side_effect=narrative):
+                second_exit = main(
+                    [
+                        "report",
+                        str(root),
+                        "--output",
+                        str(output),
+                        "--auto-inventory",
+                    ]
+                )
+            self.assertEqual(second_exit, 0)
+            warm_index = json.loads(
+                (output / "index.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(warm_index["stats"]["reused_files"], 1)
+            self.assertEqual(warm_index["stats"]["reanalyzed_files"], 0)
+
+    def test_report_discovers_inventory_automatically_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            output = Path(directory) / "report"
+            root.mkdir()
+            (root / "app.py").write_text("def main():\n    return 1\n", encoding="utf-8")
+            with patch("repo_teacher.cli._report") as report:
+                report.return_value = 0
+                result = main(["report", str(root), "--output", str(output)])
+
+            self.assertEqual(result, 0)
+            # The CLI flag now only records the legacy explicit option; report()
+            # performs automatic discovery regardless of this value.
+            self.assertFalse(report.call_args.args[-1])
+
+    def test_report_publishes_even_when_readability_review_sidecar_failed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            output = Path(directory) / "report"
+            root.mkdir()
+            (root / "app.py").write_text("def main():\n    return 1\n", encoding="utf-8")
+
+            def narrative(
+                _source: Path,
+                pack: dict,
+                _workspace: Path,
+                _timeout: int,
+                _inventory: str | None = None,
+            ) -> dict:
+                feature = pack["feature_hints"][0]
+                evidence_id = pack["evidence"][0]["id"]
+                (_workspace / "human-readability-review.json").write_text(
+                    json.dumps(
+                        {
+                            "status": "failed",
+                            "blocking_issues": [
+                                {
+                                    "code": "readability-missing-diagram",
+                                    "message": "diagram missing",
+                                }
+                            ],
+                            "retry_stage": "human-readability-review",
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                return {
+                    "schema_version": "repo-teacher-human-report/v1",
+                    "project": {
+                        "commit": pack["project"]["commit"],
+                        "analysis_fingerprint": pack["project"]["analysis_fingerprint"],
+                        "overview": {
+                            "one_liner": "一个顺序执行的本地命令服务。",
+                            "capability_order": ["command-service"],
+                        },
+                    },
+                    "generator": {"name": "Codex", "method": "test synthesis"},
+                    "chapters": [
+                        {
+                            "id": "command-service",
+                            "title": "Command Service",
+                            "summary": "Expose one user-facing command.",
+                            "mechanism": "cli",
+                            "question": "How does one command run?",
+                            "use_when": "Local automation.",
+                            "distinguish": "A command is a product action, not merely main().",
+                            "source_feature_ids": [feature["id"]],
+                            "evidence_ids": [evidence_id],
+                            "source_refs": [
+                                {
+                                    "path": "app.py",
+                                    "line_start": 1,
+                                    "line_end": 1,
+                                    "claim": "入口存在。",
+                                },
+                                {
+                                    "path": "app.py",
+                                    "line_start": 1,
+                                    "line_end": 2,
+                                    "claim": "运行一次后返回。",
+                                },
+                                {
+                                    "path": "app.py",
+                                    "line_start": 2,
+                                    "line_end": 2,
+                                    "claim": "没有持久状态。",
+                                },
+                            ],
+                            "runtime_story": {
+                                "trigger": "User command",
+                                "owner": "CLI parser",
+                                "output": "Command result",
+                                "consumer": "User",
+                                "steps": ["Parse", "Dispatch", "Return"],
+                            },
+                            "construction": {
+                                "explanation": "Parser and handler stay explicit.",
+                                "objects": [
+                                    {"name": "Parser", "role": "Parse input"},
+                                    {"name": "Handler", "role": "Execute action"},
+                                ],
+                            },
+                            "mechanism_model": {
+                                "plain_summary": "This is one parse-dispatch-return pass.",
+                                "storage": "No independent storage.",
+                                "write_path": "The parser writes validated fields to memory.",
+                                "read_path": "The handler reads the parsed command from memory.",
+                                "control_loop": "One bounded pass, not a loop.",
+                                "decision_rules": "The command name selects one handler.",
+                                "termination": "The handler returns or validation fails.",
+                                "dynamic_behavior": "Runtime code generation is unsupported.",
+                                "worked_example": ["Parse", "Dispatch", "Return"],
+                            },
+                            "state_flow": [
+                                {
+                                    "stage": "Input",
+                                    "reads": "argv",
+                                    "writes": "command",
+                                    "why_next": "parse succeeds",
+                                },
+                                {
+                                    "stage": "Run",
+                                    "reads": "command",
+                                    "writes": "result",
+                                    "why_next": "handler returns",
+                                },
+                            ],
+                            "difficulty_map": {
+                                "summary": "Dispatch must stay explicit.",
+                                "unknowns": [],
+                                "items": [
+                                    {
+                                        "id": "dispatch",
+                                        "title": "Safe dispatch",
+                                        "why_hard": "Unchecked input crosses a boundary.",
+                                        "naive_failure": "Run an unknown command.",
+                                        "reuse_question": "Which commands are allowed?",
+                                        "runtime_steps": ["Parse", "Validate", "Dispatch"],
+                                        "invariants": ["Only registered commands run"],
+                                        "failure_modes": ["Unknown command"],
+                                        "tradeoffs": ["Explicit registration costs boilerplate"],
+                                        "evidence_ids": [evidence_id],
+                                    }
+                                ],
+                            },
+                            "design_choices": [
+                                {
+                                    "choice": "Registered commands",
+                                    "why": "Auditable",
+                                    "cost": "Boilerplate",
+                                },
+                                {
+                                    "choice": "Separate handler",
+                                    "why": "Testable",
+                                    "cost": "Extra layer",
+                                },
+                            ],
+                            "boundary": {
+                                "supported": ["Registered command"],
+                                "unsupported": ["Remote execution"],
+                            },
+                            "reuse_plan": {
+                                "take": ["Dispatch boundary"],
+                                "adapt": ["Commands"],
+                                "avoid": ["Unchecked eval"],
+                                "verify": ["Invalid input"],
+                            },
+                        }
+                    ],
+                }
+
+            with patch(
+                "repo_teacher.commands.entrypoints.synthesize_direct_human_report",
+                side_effect=narrative,
+            ):
+                exit_code = main(
+                    [
+                        "report",
+                        str(root),
+                        "--output",
+                        str(output),
+                        "--auto-inventory",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue((output / "index.html").is_file())
+            validation = json.loads(
+                (output / "current" / "validation-report.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertEqual(validation["status"], "passed")
+            self.assertNotIn("human_readability", validation["checks"])
+            self.assertFalse((output / "human-readability-review.json").exists())
+
+    def test_report_publication_exposes_every_linear_stage_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            output = Path(directory) / "report"
+            root.mkdir()
+            (root / "app.py").write_text("def main():\n    return 1\n", encoding="utf-8")
+
+            def narrative(
+                _source: Path,
+                pack: dict,
+                _workspace: Path,
+                _timeout: int,
+                _inventory: str | None = None,
+            ) -> dict:
+                feature = pack["feature_hints"][0]
+                evidence_id = pack["evidence"][0]["id"]
+                return {
+                    "schema_version": "repo-teacher-human-report/v1",
+                    "project": {
+                        "commit": pack["project"]["commit"],
+                        "analysis_fingerprint": pack["project"]["analysis_fingerprint"],
+                        "overview": {
+                            "one_liner": "一个顺序执行的本地命令服务。",
+                            "capability_order": ["command-service"],
+                        },
+                    },
+                    "generator": {"name": "Codex", "method": "test synthesis"},
+                    "chapters": [
+                        {
+                            "id": "command-service",
+                            "title": "Command Service",
+                            "summary": "Expose one user-facing command.",
+                            "mechanism": "cli",
+                            "question": "How does one command run?",
+                            "use_when": "Local automation.",
+                            "distinguish": "A command is a product action, not merely main().",
+                            "source_feature_ids": [feature["id"]],
+                            "evidence_ids": [evidence_id],
+                            "source_refs": [
+                                {"path": "app.py", "line_start": 1, "line_end": 1, "claim": "入口存在。"},
+                                {"path": "app.py", "line_start": 1, "line_end": 2, "claim": "运行一次后返回。"},
+                                {"path": "app.py", "line_start": 2, "line_end": 2, "claim": "没有持久状态。"},
+                            ],
+                            "runtime_story": {
+                                "trigger": "User command",
+                                "owner": "CLI parser",
+                                "output": "Command result",
+                                "consumer": "User",
+                                "steps": ["Parse", "Dispatch", "Return"],
+                            },
+                            "construction": {
+                                "explanation": "Parser and handler stay explicit.",
+                                "objects": [
+                                    {"name": "Parser", "role": "Parse input"},
+                                    {"name": "Handler", "role": "Execute action"},
+                                ],
+                            },
+                            "mechanism_model": {
+                                "plain_summary": "This is one parse-dispatch-return pass.",
+                                "storage": "No independent storage.",
+                                "write_path": "The parser writes validated fields to memory.",
+                                "read_path": "The handler reads the parsed command from memory.",
+                                "control_loop": "One bounded pass, not a loop.",
+                                "decision_rules": "The command name selects one handler.",
+                                "termination": "The handler returns or validation fails.",
+                                "dynamic_behavior": "Runtime code generation is unsupported.",
+                                "worked_example": ["Parse", "Dispatch", "Return"],
+                            },
+                            "state_flow": [
+                                {"stage": "Input", "reads": "argv", "writes": "command", "why_next": "parse succeeds"},
+                                {"stage": "Run", "reads": "command", "writes": "result", "why_next": "handler returns"},
+                            ],
+                            "difficulty_map": {
+                                "summary": "Dispatch must stay explicit.",
+                                "unknowns": [],
+                                "items": [
+                                    {
+                                        "id": "dispatch",
+                                        "title": "Safe dispatch",
+                                        "why_hard": "Unchecked input crosses a boundary.",
+                                        "naive_failure": "Run an unknown command.",
+                                        "reuse_question": "Which commands are allowed?",
+                                        "runtime_steps": ["Parse", "Validate", "Dispatch"],
+                                        "invariants": ["Only registered commands run"],
+                                        "failure_modes": ["Unknown command"],
+                                        "tradeoffs": ["Explicit registration costs boilerplate"],
+                                        "evidence_ids": [evidence_id],
+                                    }
+                                ],
+                            },
+                            "design_choices": [
+                                {"choice": "Registered commands", "why": "Auditable", "cost": "Boilerplate"},
+                                {"choice": "Separate handler", "why": "Testable", "cost": "Extra layer"},
+                            ],
+                            "boundary": {"supported": ["Registered command"], "unsupported": ["Remote execution"]},
+                            "reuse_plan": {"take": ["Dispatch boundary"], "adapt": ["Commands"], "avoid": ["Unchecked eval"], "verify": ["Invalid input"]},
+                        }
+                    ],
+                }
+
+            with patch(
+                "repo_teacher.commands.entrypoints.synthesize_direct_human_report",
+                side_effect=narrative,
+            ):
+                exit_code = main(
+                    ["report", str(root), "--output", str(output), "--auto-inventory"]
+                )
+
+            self.assertEqual(exit_code, 0)
+            published_stage_files = {
+                path.name
+                for path in output.with_name(f".{output.name}.pipeline").joinpath("stages").glob("*.json")
+                if path.name != "pipeline.json"
+            }
+            self.assertEqual(
+                published_stage_files,
+                {f"{stage}.json" for stage in LINEAR_REPORT_STAGES},
+            )
+
+    def test_report_retry_reuses_passed_stages_after_publication_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            output = Path(directory) / "report"
+            root.mkdir()
+            (root / "app.py").write_text("def main():\n    return 1\n", encoding="utf-8")
+            synthesize_calls = 0
+            real_publish = GenerationPublisher.publish
+            publish_calls = 0
+
+            def narrative(
+                _source: Path,
+                pack: dict,
+                _workspace: Path,
+                _timeout: int,
+                _inventory: str | None = None,
+            ) -> dict:
+                nonlocal synthesize_calls
+                synthesize_calls += 1
+                feature = pack["feature_hints"][0]
+                evidence_id = pack["evidence"][0]["id"]
+                return {
+                    "schema_version": "repo-teacher-human-report/v1",
+                    "project": {
+                        "commit": pack["project"]["commit"],
+                        "analysis_fingerprint": pack["project"]["analysis_fingerprint"],
+                        "overview": {
+                            "one_liner": "一个顺序执行的本地命令服务。",
+                            "capability_order": ["command-service"],
+                        },
+                    },
+                    "generator": {"name": "Codex", "method": "test synthesis"},
+                    "chapters": [
+                        {
+                            "id": "command-service",
+                            "title": "Command Service",
+                            "summary": "Expose one user-facing command.",
+                            "mechanism": "cli",
+                            "question": "How does one command run?",
+                            "use_when": "Local automation.",
+                            "distinguish": "A command is a product action, not merely main().",
+                            "source_feature_ids": [feature["id"]],
+                            "evidence_ids": [evidence_id],
+                            "source_refs": [
+                                {"path": "app.py", "line_start": 1, "line_end": 1, "claim": "入口存在。"},
+                                {"path": "app.py", "line_start": 1, "line_end": 2, "claim": "运行一次后返回。"},
+                                {"path": "app.py", "line_start": 2, "line_end": 2, "claim": "没有持久状态。"},
+                            ],
+                            "runtime_story": {
+                                "trigger": "User command",
+                                "owner": "CLI parser",
+                                "output": "Command result",
+                                "consumer": "User",
+                                "steps": ["Parse", "Dispatch", "Return"],
+                            },
+                            "construction": {
+                                "explanation": "Parser and handler stay explicit.",
+                                "objects": [
+                                    {"name": "Parser", "role": "Parse input"},
+                                    {"name": "Handler", "role": "Execute action"},
+                                ],
+                            },
+                            "mechanism_model": {
+                                "plain_summary": "This is one parse-dispatch-return pass.",
+                                "storage": "No independent storage.",
+                                "write_path": "The parser writes validated fields to memory.",
+                                "read_path": "The handler reads the parsed command from memory.",
+                                "control_loop": "One bounded pass, not a loop.",
+                                "decision_rules": "The command name selects one handler.",
+                                "termination": "The handler returns or validation fails.",
+                                "dynamic_behavior": "Runtime code generation is unsupported.",
+                                "worked_example": ["Parse", "Dispatch", "Return"],
+                            },
+                            "state_flow": [
+                                {"stage": "Input", "reads": "argv", "writes": "command", "why_next": "parse succeeds"},
+                                {"stage": "Run", "reads": "command", "writes": "result", "why_next": "handler returns"},
+                            ],
+                            "difficulty_map": {
+                                "summary": "Dispatch must stay explicit.",
+                                "unknowns": [],
+                                "items": [
+                                    {
+                                        "id": "dispatch",
+                                        "title": "Safe dispatch",
+                                        "why_hard": "Unchecked input crosses a boundary.",
+                                        "naive_failure": "Run an unknown command.",
+                                        "reuse_question": "Which commands are allowed?",
+                                        "runtime_steps": ["Parse", "Validate", "Dispatch"],
+                                        "invariants": ["Only registered commands run"],
+                                        "failure_modes": ["Unknown command"],
+                                        "tradeoffs": ["Explicit registration costs boilerplate"],
+                                        "evidence_ids": [evidence_id],
+                                    }
+                                ],
+                            },
+                            "design_choices": [
+                                {"choice": "Registered commands", "why": "Auditable", "cost": "Boilerplate"},
+                                {"choice": "Separate handler", "why": "Testable", "cost": "Extra layer"},
+                            ],
+                            "boundary": {"supported": ["Registered command"], "unsupported": ["Remote execution"]},
+                            "reuse_plan": {"take": ["Dispatch boundary"], "adapt": ["Commands"], "avoid": ["Unchecked eval"], "verify": ["Invalid input"]},
+                        }
+                    ],
+                }
+
+            def flaky_publish(self: GenerationPublisher, artifacts: dict[str, str]) -> None:
+                nonlocal publish_calls
+                publish_calls += 1
+                if publish_calls == 1:
+                    raise OSError("injected publish failure")
+                real_publish(self, artifacts)
+
+            with patch(
+                "repo_teacher.commands.entrypoints.synthesize_direct_human_report",
+                side_effect=narrative,
+            ), patch(
+                "repo_teacher.commands.report.GenerationPublisher.publish",
+                new=flaky_publish,
+            ):
+                first = main(
+                    ["report", str(root), "--output", str(output), "--auto-inventory"]
+                )
+                second = main(
+                    ["report", str(root), "--output", str(output), "--auto-inventory"]
+                )
+
+            self.assertEqual((first, second), (1, 0))
+            self.assertEqual(synthesize_calls, 1)
 
     def test_source_audited_manifest_can_be_converted_into_inventory(self) -> None:
         pack = {
@@ -1253,7 +2535,7 @@ class CliTest(unittest.TestCase):
             stderr = io.StringIO()
 
             with (
-                patch("repo_teacher.cli.build_index", return_value=partial),
+                patch("repo_teacher.commands.entrypoints.build_index", return_value=partial),
                 contextlib.redirect_stderr(stderr),
             ):
                 exit_code = main(["index", str(root), "--output", str(output)])

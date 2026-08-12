@@ -1,0 +1,12 @@
+{
+  "example_kind": "invalid-mutation",
+  "apply_to": "capability-inventory-good.json",
+  "mutation": {
+    "json_pointer": "/module_dispositions/0/capability_ids/0",
+    "replace": "agent-task-execution",
+    "with": "raw-shard-task-id"
+  },
+  "expected_result": "reject",
+  "expected_error": "module disposition references an unknown capability id",
+  "why": "全局归组完成后，模块处置仍引用分片阶段的临时 ID；静默删除会破坏模块覆盖闭包。"
+}

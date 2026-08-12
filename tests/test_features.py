@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from repo_teacher.evidence import EvidenceStore
-from repo_teacher.features import discover_features
+from repo_teacher.features import _find_node_runtime, discover_features
 from repo_teacher.indexer import build_index
 from repo_teacher.models import FileRecord, ModuleSummary, RelationshipRecord, SymbolRecord, stable_id
 from repo_teacher.report import render_report
@@ -15,6 +15,33 @@ from repo_teacher.validation import validate_index
 
 
 class FeatureDiscoveryTest(unittest.TestCase):
+    def test_node_runtime_discovery_uses_the_login_shell_for_external_nvm(self) -> None:
+        _find_node_runtime.cache_clear()
+        with tempfile.TemporaryDirectory() as directory:
+            node = Path(directory) / "node"
+            node.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            node.chmod(0o755)
+            completed = subprocess.CompletedProcess(
+                args=["zsh"], returncode=0, stdout=f"{node}\n", stderr=""
+            )
+            with (
+                patch.dict("repo_teacher.features.os.environ", {"SHELL": "/bin/zsh"}, clear=True),
+                patch("repo_teacher.features.shutil.which", return_value=None),
+                patch("repo_teacher.features.subprocess.run", return_value=completed) as run,
+            ):
+                discovered = _find_node_runtime()
+
+            self.assertEqual(discovered, str(node.resolve()))
+            run.assert_called_once_with(
+                ["/bin/zsh", "-ilc", "command -v node"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                timeout=20.0,
+                check=False,
+            )
+        _find_node_runtime.cache_clear()
+
     def test_discovers_cli_command_and_follows_resolved_call_path(self) -> None:
         cli_source = """import argparse
 from .worker import run_job
@@ -1136,11 +1163,11 @@ def persist_job():
                 encoding="utf-8",
             )
 
-            with patch("repo_teacher.features.shutil.which", return_value=None):
+            with patch("repo_teacher.features._find_node_runtime", return_value=None):
                 unavailable = build_index(root)
                 unavailable_validation = validate_index(unavailable, root)
             with (
-                patch("repo_teacher.features.shutil.which", return_value="/usr/bin/node"),
+                patch("repo_teacher.features._find_node_runtime", return_value="/usr/bin/node"),
                 patch(
                     "repo_teacher.features.subprocess.run",
                     side_effect=subprocess.TimeoutExpired("node", 3.0),

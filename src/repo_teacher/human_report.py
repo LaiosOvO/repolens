@@ -278,7 +278,7 @@ def human_report_json_schema() -> dict[str, Any]:
                     "analysis_fingerprint": text,
                     "overview": overview,
                 },
-                "required": ["commit", "analysis_fingerprint"],
+                "required": ["commit", "analysis_fingerprint", "overview"],
                 "additionalProperties": False,
             },
             "generator": {
@@ -610,6 +610,12 @@ def build_report_pack(
             "最后再看源码证据",
         ],
         "capability_graph": prompt_graph,
+        "file_hashes": {
+            str(item["path"]): str(item["sha256"])
+            for item in _dicts(index.get("files"))
+            if isinstance(item.get("path"), str)
+            and isinstance(item.get("sha256"), str)
+        },
         "modules": _dicts(index.get("modules"))[:200],
         "reading_path": _dicts(index.get("reading_path"))[:100],
         "feature_hints": bounded_hints,
@@ -761,6 +767,22 @@ def compose_human_report(
             raise ValueError("human report chapter IDs and titles must be unique")
         seen_ids.add(chapter_id)
         seen_titles.add(title.casefold())
+
+    overview = narrative_project.get("overview")
+    if not isinstance(overview, dict):
+        raise ValueError("human report project overview is required")
+    ordered_ids = _strings(overview.get("capability_order"))
+    if ordered_ids != [str(chapter["id"]) for chapter in chapters]:
+        raise ValueError(
+            "project overview capability_order must equal chapter IDs in reading order"
+        )
+    referenced_axis_ids = {
+        capability_id
+        for axis in _dicts(overview.get("core_product_axes"))
+        for capability_id in _strings(axis.get("capability_ids"))
+    }
+    if not referenced_axis_ids <= seen_ids:
+        raise ValueError("project overview axes reference unknown capability chapters")
 
     composed = copy.deepcopy(dict(index))
     composed_evidence = _dicts(composed.get("evidence"))

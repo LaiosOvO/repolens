@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import ast
+import functools
 import hashlib
 import itertools
+import os
 import re
 import shutil
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from .capability_catalog import TECHNOLOGY_DIMENSIONS, discover_source_audited_capabilities
 from .evidence import EvidenceStore
@@ -1960,13 +1962,81 @@ class _JSBoundaryAnalyzer:
         )
 
 
+def _find_node_runtime() -> str | None:
+    """Locate Node for non-interactive CLI runs, including NVM login shells."""
+
+    return _find_node_runtime_cached(_node_runtime_signature())
+
+
+def _node_runtime_signature() -> tuple[str | None, str | None, str | None, str | None]:
+    """Return the environment inputs that change Node discovery results."""
+
+    return (
+        os.environ.get("REPO_TEACHER_NODE"),
+        os.environ.get("NVM_BIN"),
+        os.environ.get("SHELL"),
+        os.environ.get("PATH"),
+    )
+
+
+@functools.lru_cache(maxsize=32)
+def _find_node_runtime_cached(
+    signature: tuple[str | None, str | None, str | None, str | None]
+) -> str | None:
+    """Locate Node for one specific environment signature."""
+
+    del signature
+    candidates = [
+        os.environ.get("REPO_TEACHER_NODE"),
+        str(Path(os.environ["NVM_BIN"]) / "node") if os.environ.get("NVM_BIN") else None,
+        shutil.which("node"),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        path = Path(candidate).expanduser()
+        if path.is_file() and os.access(path, os.X_OK):
+            return str(path.resolve())
+
+    shell = os.environ.get("SHELL")
+    if not shell:
+        return None
+    shell_path = Path(shell).expanduser()
+    if not shell_path.is_file() or not os.access(shell_path, os.X_OK):
+        return None
+    try:
+        discovered = subprocess.run(
+            [str(shell_path), "-ilc", "command -v node"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=20.0,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if discovered.returncode != 0:
+        return None
+    lines = [line.strip() for line in discovered.stdout.splitlines() if line.strip()]
+    if not lines:
+        return None
+    path = Path(lines[-1]).expanduser()
+    if not path.is_file() or not os.access(path, os.X_OK):
+        return None
+    return str(path.resolve())
+
+
+_find_node_runtime.cache_clear = _find_node_runtime_cached.cache_clear  # type: ignore[attr-defined]
+_find_node_runtime.cache_info = _find_node_runtime_cached.cache_info  # type: ignore[attr-defined]
+
+
 def _node_check_javascript(source: str, path: str) -> bool:
     """Parse JavaScript without executing it; absence or uncertainty fails closed."""
 
     suffix = PurePosixPath(path).suffix.lower()
     if suffix not in {".js", ".mjs", ".cjs"}:
         return True
-    node = shutil.which("node")
+    node = _find_node_runtime()
     if node is None:
         return False
     modes = (

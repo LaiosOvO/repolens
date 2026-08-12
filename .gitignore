@@ -6,6 +6,7 @@ build/
 dist/
 .repo-teacher/
 .mypy_cache/
+.codegraph/
 .ruff_cache/
 .omx/
 .DS_Store

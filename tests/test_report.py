@@ -131,6 +131,15 @@ class ReportTest(unittest.TestCase):
         self.assertIn("最后：父 worker 聚合 response 或取消剩余任务", glance)
         self.assertNotIn("bus 把请求放入目标 worker 的订阅队列", glance)
         self.assertIn('class="interaction-diagram"', result)
+        self.assertIn('data-diagram-skill="markdown-viewer/uml"', result)
+        self.assertIn('data-diagram-type="activity"', result)
+        self.assertEqual(result.count('class="interaction-node"'), 4)
+        self.assertEqual(result.count('class="interaction-arrow"'), 3)
+        self.assertEqual(result.count('class="activity-node"'), 4)
+        self.assertIn("运行时活动图", result)
+        self.assertIn("START", result)
+        self.assertIn("END", result)
+        self.assertNotIn('class="interaction-roles"', result)
         self.assertIn("父 worker 提交 job payload", result)
         self.assertIn("目标 worker 执行业务定义的 job handler", result)
         self.assertIn("比如，一次真实交互会这样发生", result)
@@ -139,7 +148,7 @@ class ReportTest(unittest.TestCase):
             result.index("底层机制到底怎么工作"),
         )
 
-    def test_human_capabilities_are_grouped_by_product_axis_and_support_is_collapsed(self) -> None:
+    def test_human_capabilities_keep_secondary_business_functions_visible(self) -> None:
         features = [
             {
                 "id": "feature_call",
@@ -179,8 +188,10 @@ class ReportTest(unittest.TestCase):
         self.assertIn("产品主轴 01", result)
         self.assertIn("实时语音通话平台", result)
         self.assertIn("核心子功能 01", result)
-        self.assertIn('<details class="supporting-capabilities">', result)
-        self.assertIn("支撑能力 02", result)
+        self.assertNotIn('<details class="supporting-capabilities">', result)
+        self.assertIn('class="secondary-capabilities"', result)
+        self.assertIn("扩展业务功能 02", result)
+        self.assertIn("全部直接展示", result)
         self.assertLess(result.index("实时语音通话平台"), result.index("数据库迁移"))
 
     def test_waku_report_is_a_human_tutorial_not_an_entrypoint_catalog(self) -> None:

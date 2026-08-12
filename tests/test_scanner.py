@@ -66,6 +66,25 @@ class ScannerTest(unittest.TestCase):
             self.assertEqual(result.skipped["too_large"], 1)
             self.assertEqual(result.skipped["binary"], 1)
 
+    def test_tool_caches_are_excluded_from_scan_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / ".ruff_cache").mkdir()
+            (root / ".codegraph").mkdir()
+            (root / "src" / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (root / ".ruff_cache" / "cache.bin").write_bytes(b"tool-state")
+            (root / ".codegraph" / "codegraph.db").write_bytes(b"graph-state")
+
+            result = scan_repository(root)
+            manifest_before = capture_tree_manifest(root)
+            (root / ".ruff_cache" / "cache.bin").write_bytes(b"changed-tool-state")
+            (root / ".codegraph" / "codegraph.db").write_bytes(b"changed-graph-state")
+            manifest_after = capture_tree_manifest(root)
+
+            self.assertEqual([item.path for item in result.files], ["src/app.py"])
+            self.assertEqual(manifest_before, manifest_after)
+
     def test_non_git_directory_is_reported_without_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

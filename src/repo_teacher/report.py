@@ -3,7 +3,7 @@ from __future__ import annotations
 import html
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 
 _REFERENCE_CONTRIBUTIONS: tuple[dict[str, str], ...] = (
@@ -489,7 +489,7 @@ def _render_human_decision_guide(
         human_chapter = tutorial.get("human_chapter", {}) if isinstance(tutorial, dict) else {}
         chapter_id = _text(human_chapter.get("id"), _text(feature.get("id")))
         hierarchy_label = (
-            "支撑能力"
+            "扩展业务功能"
             if chapter_id in supporting_ids
             else "核心子功能" if chapter_id in axis_by_capability else "功能"
         )
@@ -574,21 +574,20 @@ def _render_human_decision_guide(
     if axes:
         supporting_records.extend(unclassified_records)
         supporting_html = (
-            '<details class="supporting-capabilities"><summary><span>支撑能力</span><b>'
+            '<section class="secondary-capabilities"><header><span>扩展业务功能</span><b>'
             + str(len(supporting_records))
-            + ' 项：运维、治理、通用平台与工程能力</b><small>默认折叠，不与核心产品能力并列</small>'
-            + '</summary><div class="human-capability-grid">'
+            + ' 项独立用户能力</b><small>阅读优先级较低，但全部直接展示</small>'
+            + '</header><div class="human-capability-grid">'
             + "".join(item["card"] for item in supporting_records)
-            + '</div></details>'
+            + '</div></section>'
             if supporting_records
             else ""
         )
         capability_html = "".join(hierarchy_sections) + supporting_html
-        rows_html = "".join(core_rows)
+        rows_html = "".join(item["row"] for item in records)
         intro = (
-            f'先看 <b>{len(hierarchy_sections)} 条产品主轴</b>，再看 '
-            f'<b>{len(core_rows)} 个核心子功能</b>；'
-            f'{len(supporting_records)} 个支撑能力默认折叠。'
+            f'先看 <b>{len(hierarchy_sections)} 条产品主轴</b>建立分类，再逐项看 '
+            f'<b>{len(records)} 个独立业务功能</b>；主轴不是功能数量，所有功能都直接展示。'
         )
     else:
         capability_html = '<div class="human-capability-grid">' + "".join(
@@ -1056,18 +1055,17 @@ def _group_features(
 
 
 def _render_feature_directory(
-    features: list[dict[str, Any]], modules_by_id: dict[str, dict[str, Any]]
+    features: list[dict[str, Any]],
+    modules_by_id: dict[str, dict[str, Any]],
+    *,
+    tutorial_mode: bool = False,
 ) -> str:
     if not features:
         return (
             '<div class="feature-empty"><strong>尚未识别出可独立讲解的功能</strong>'
             '<p>这份索引仍可用于查看阅读路线、模块和源码证据；重新生成 schema 2.0 索引后会出现功能视图。</p></div>'
         )
-    human_report_features = all(
-        _text(feature.get("source")) == "llm-evidence-synthesis"
-        for feature in features
-    )
-    if all(_waku_mechanism(feature) for feature in features) or human_report_features:
+    if tutorial_mode:
         items = []
         for position, feature in enumerate(features, start=1):
             human_title, human_summary = _human_copy(feature)
@@ -1402,18 +1400,28 @@ def _render_human_feature_chapter(
         ("产生", story.get("output")),
         ("交给", story.get("consumer")),
     )
-    interaction_role_html = "".join(
-        '<li><span>' + f"{role_position:02d}" + '</span><div><b>'
+    interaction_nodes = [
+        '<article class="interaction-node"><span>' + f"{role_position:02d}" + '</span><div><b>'
         + html.escape(label) + '</b><p>'
-        + html.escape(_text(value, "未知")) + '</p></div></li>'
+        + html.escape(_text(value, "未知")) + '</p></div></article>'
         for role_position, (label, value) in enumerate(interaction_roles, start=1)
+    ]
+    interaction_arrow = (
+        '<svg class="interaction-arrow" viewBox="0 0 52 24" aria-hidden="true" '
+        'focusable="false"><path d="M2 12H43"/><path d="m36 5 8 7-8 7"/></svg>'
     )
-    interaction_step_html = "".join(
-        '<li><span>' + f"{step_position:02d}" + '</span><p>'
-        + html.escape(_text(step)) + '</p></li>'
+    interaction_flow_html = interaction_arrow.join(interaction_nodes)
+    activity_nodes = [
+        '<article class="activity-node"><span>' + f"{step_position:02d}" + '</span><p>'
+        + html.escape(_text(step)) + '</p></article>'
         for step_position, step in enumerate(runtime_steps, start=1)
         if _text(step)
+    ]
+    activity_connector = (
+        '<svg class="activity-connector" viewBox="0 0 24 42" aria-hidden="true" '
+        'focusable="false"><path d="M12 2V33"/><path d="m5 27 7 8 7-8"/></svg>'
     )
+    activity_flow_html = activity_connector.join(activity_nodes)
     worked_example = mechanism_model.get("worked_example")
     take_items = reuse.get("take", []) if isinstance(reuse.get("take"), list) else []
     adapt_items = reuse.get("adapt", []) if isinstance(reuse.get("adapt"), list) else []
@@ -1443,11 +1451,15 @@ def _render_human_feature_chapter(
         f'<p>{html.escape(_text(chapter.get("distinguish"), "差异尚未确认"))}</p>'
         f'<small>适用：{html.escape(_text(chapter.get("use_when"), "使用边界未知"))}</small></article></div></section>'
         '<section class="human-run"><span class="answer-label">一次任务完整怎么运行</span>'
-        '<div class="interaction-diagram" role="group" aria-label="一次任务的交互图">'
-        '<div class="interaction-diagram-head"><b>交互图</b><span>谁触发 → 谁接管 → 产生什么 → 谁继续消费</span></div>'
-        f'<ol class="interaction-roles">{interaction_role_html}</ol>'
-        '<div class="interaction-detail"><b>内部怎样一步步推进</b>'
-        f'<ol>{interaction_step_html}</ol></div></div>'
+        '<div class="interaction-diagram" role="group" aria-label="一次任务的 UML 活动图" '
+        'data-diagram-skill="markdown-viewer/uml" data-diagram-type="activity">'
+        '<div class="interaction-diagram-head"><b>运行时活动图</b><span>节点和箭头表示真实交接，不是四栏摘要</span></div>'
+        f'<div class="interaction-flow">{interaction_flow_html}</div>'
+        '<div class="interaction-detail"><b>内部活动与先后关系</b>'
+        '<div class="activity-flow"><span class="activity-terminal start">START</span>'
+        f'{activity_connector if activity_nodes else ""}{activity_flow_html}'
+        f'{activity_connector if activity_nodes else ""}'
+        '<span class="activity-terminal end">END</span></div></div></div>'
         '<div class="interaction-explanation"><b>为什么要这样串起来</b><p>'
         f'{html.escape(_text(construction.get("explanation"), "当前证据没有解释模块之间为什么这样交接。"))}'
         '</p><dl><dt>持续推进靠什么</dt><dd>'
@@ -1748,7 +1760,13 @@ def _render_features(
     return "".join(groups)
 
 
-def render_report(index: dict[str, Any]) -> str:
+def render_report(
+    index: dict[str, Any],
+    *,
+    variant: Literal["auto", "canonical", "human", "compatibility"] = "auto",
+) -> str:
+    if variant not in {"auto", "canonical", "human", "compatibility"}:
+        raise ValueError(f"unsupported report variant: {variant}")
     project = index.get("project", {}) if isinstance(index.get("project", {}), dict) else {}
     stats = index.get("stats", {}) if isinstance(index.get("stats", {}), dict) else {}
     features = [item for item in index.get("features", []) if isinstance(item, dict)] if isinstance(index.get("features", []), list) else []
@@ -1777,12 +1795,17 @@ def render_report(index: dict[str, Any]) -> str:
         and not _is_unconfirmed_feature(feature)
     ]
     candidates = [feature for feature in features if _is_unconfirmed_feature(feature)]
-    is_waku = str(project_directory).lower() in {"waku", "waku-agent"}
-    waku_features = _waku_compatibility_features(features) if is_waku else []
-    is_human_report = bool(index.get("human_report")) and all(
+    inferred_human = bool(index.get("human_report")) and all(
         _text(feature.get("source")) == "llm-evidence-synthesis"
         for feature in features
     )
+    is_human_report = variant == "human" or (variant == "auto" and inferred_human)
+    is_waku = variant == "compatibility" or (
+        variant == "auto"
+        and not is_human_report
+        and str(project_directory).lower() in {"waku", "waku-agent"}
+    )
+    waku_features = _waku_compatibility_features(features) if is_waku else []
     human_report_meta = (
         index.get("human_report") if isinstance(index.get("human_report"), dict) else {}
     )
@@ -1905,11 +1928,14 @@ def render_report(index: dict[str, Any]) -> str:
     .source-link{display:inline;max-width:100%;margin:0 7px 7px 0;color:var(--green);text-decoration:none;white-space:normal;overflow-wrap:anywhere}.source-link:hover{text-decoration:underline}
     .project-overview{padding:54px 0 18px}.project-overview>.section-head{margin-bottom:22px}.project-definition{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;overflow:hidden;border:1px solid var(--line);border-radius:20px;background:var(--line)}.project-definition article{display:grid;gap:9px;padding:24px;background:#fff}.project-definition span,.architecture-summary span,.runtime-component-grid header span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.project-definition strong{font:750 1.12rem/1.55 Georgia,"Songti SC",serif}.architecture-head{margin-top:52px}.project-journey{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1px;margin:0;padding:1px;list-style:none;border-radius:20px;background:var(--green);overflow:hidden}.project-journey li{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;padding:22px;background:#fff}.project-journey>li>b{color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.project-journey span{color:var(--green);font-size:11px;font-weight:850}.project-journey h4{margin:6px 0 10px;font-size:1rem}.project-journey p,.project-journey small{margin:0;color:var(--muted)}.architecture-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px;min-width:0}.architecture-summary article{min-width:0;padding:22px;border:1px solid var(--line);border-radius:17px;background:#fafaf6;overflow-wrap:anywhere}.architecture-summary article:first-child{grid-column:span 2;background:var(--green-soft)}.architecture-summary h3{max-width:100%;margin:10px 0 8px;font:750 1.25rem/1.35 Georgia,"Songti SC",serif;overflow-wrap:anywhere}.architecture-summary p{margin:8px 0 0;color:var(--muted);overflow-wrap:anywhere}.runtime-component-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.runtime-component-grid article{padding:22px;border:1px solid var(--line);border-radius:18px}.runtime-component-grid h4{margin:8px 0 12px;font-size:1.2rem}.runtime-component-grid p{color:var(--muted)}.runtime-component-grid dl{display:grid;grid-template-columns:92px minmax(0,1fr);gap:8px 12px}.runtime-component-grid dt{color:var(--green);font-size:12px;font-weight:800}.runtime-component-grid dd{margin:0}.code-organization-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:18px}.code-organization{width:100%;min-width:780px;border-collapse:collapse;background:#fff}.code-organization th,.code-organization td{padding:16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}.code-organization th{width:20%}.code-organization th code,.code-organization th small{display:block;overflow-wrap:anywhere}.code-organization th small{margin-top:6px;color:var(--orange)}.overview-boundary{display:grid;grid-template-columns:.8fr 1.2fr;gap:12px;margin-top:14px}.overview-boundary>div,.overview-boundary details{padding:20px;border:1px solid var(--line);border-radius:17px;background:#fafaf6}.overview-boundary ul,.overview-boundary ol{margin-bottom:0;padding-left:20px}.overview-boundary details summary{cursor:pointer;color:var(--green);font-weight:850}.overview-boundary details li{margin:10px 0}.overview-boundary details li span{display:block;margin-top:4px;color:var(--muted)}
     .product-axis-head{display:block}.product-axis-grid{display:grid;grid-template-columns:1fr;gap:14px}.product-axis-grid>article{display:grid;gap:15px;padding:26px;border:1px solid var(--line);border-radius:20px;background:var(--green-soft)}.product-axis-grid header{position:static;display:grid;gap:7px;padding:0;border:0;background:transparent;backdrop-filter:none}.product-axis-grid header span,.product-capability-group>header>span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.product-axis-grid header b{font:750 1.45rem/1.35 Georgia,"Songti SC",serif}.product-axis-grid h3,.product-axis-grid p{margin:0}.product-axis-grid h3{max-width:920px;font-size:1.08rem}.axis-interaction{padding:18px;border:1px solid rgba(11,107,76,.2);border-radius:16px;background:#fff}.axis-interaction>b{display:block;margin-bottom:13px;color:var(--green);font-size:.82rem}.axis-interaction ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:28px;margin:0;padding:0;list-style:none}.axis-interaction li{position:relative;min-width:0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#fafaf6}.axis-interaction li:not(:last-child):after{position:absolute;right:-22px;top:50%;content:"→";color:var(--orange);font-weight:900;transform:translateY(-50%)}.axis-interaction li span{color:var(--orange);font:850 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.axis-interaction li p{margin-top:7px;overflow-wrap:anywhere}.axis-outcome{padding-top:12px;border-top:1px solid rgba(11,107,76,.18)}.product-axis-grid footer{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0;padding-top:13px;border-top:1px solid rgba(11,107,76,.18);color:var(--muted)}.supporting-count{margin:14px 0 0;color:var(--muted)}.product-capability-group{margin:26px 0 0;padding:0}.product-capability-group>header{position:static;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 20px;margin-bottom:13px;padding:20px 22px;border:1px solid var(--line);border-left:6px solid var(--green);border-radius:0 17px 17px 0;background:var(--green-soft);backdrop-filter:none}.product-capability-group>header>span{grid-row:1/4}.product-capability-group>header h3,.product-capability-group>header p{margin:0}.product-capability-group>header h3{font-size:1.5rem}.product-capability-group>header p{color:var(--muted)}.product-capability-group>header strong{font-size:.9rem}.supporting-capabilities{margin-top:26px;border:1px solid var(--line);border-radius:18px;background:#fafaf6}.supporting-capabilities>summary{display:grid;grid-template-columns:max-content minmax(0,1fr) auto;gap:12px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none}.supporting-capabilities>summary::-webkit-details-marker{display:none}.supporting-capabilities>summary span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.supporting-capabilities>summary small{color:var(--muted)}.supporting-capabilities>.human-capability-grid{padding:0 18px 18px}.engineering-structure{display:grid;grid-template-columns:.65fr 1.35fr;gap:12px}.engineering-verdict,.engineering-table-wrap{min-width:0;border:1px solid var(--line);border-radius:18px;background:#fff}.engineering-verdict{display:grid;align-content:start;gap:8px;padding:24px;background:var(--green-soft)}.engineering-verdict>span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em;text-transform:uppercase}.engineering-verdict strong{margin-bottom:12px;font:750 1.2rem/1.4 Georgia,"Songti SC",serif}.engineering-verdict p{color:var(--muted)}.engineering-table-wrap{overflow-x:auto}.engineering-layer-table{width:100%;min-width:720px;border-collapse:collapse}.engineering-layer-table th,.engineering-layer-table td{padding:16px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}.engineering-layer-table thead th{background:#18201b;color:#fff;font-size:.78rem}.engineering-layer-table tbody th{width:18%;color:var(--green)}.engineering-layer-table td:nth-child(2){width:46%}.engineering-layer-table tr:last-child th,.engineering-layer-table tr:last-child td{border-bottom:0}
+    .secondary-capabilities{margin-top:28px;padding:22px!important;border:1px solid var(--line);border-radius:20px;background:#fafaf6}.secondary-capabilities>header{position:static;display:grid;grid-template-columns:max-content minmax(0,1fr) auto;gap:10px 16px;margin:0 0 16px;padding:0;border:0;background:transparent;backdrop-filter:none}.secondary-capabilities>header span{color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.secondary-capabilities>header small{color:var(--muted)}
     .mechanism-verdict{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:14px;align-items:start;margin-bottom:18px;padding:18px;border-left:6px solid var(--orange);border-radius:0 14px 14px 0;background:#fff}.mechanism-verdict span{color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em}.mechanism-verdict strong{font-size:1.18rem;line-height:1.65}
     .feature-thesis{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:11px 16px;align-items:start;margin:18px 0 0;padding:18px 20px;border-left:5px solid var(--orange);border-radius:0 14px 14px 0;background:var(--orange-soft)}.feature-thesis span{padding-top:4px;color:var(--orange);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.feature-thesis strong{font:750 1.2rem/1.58 Georgia,"Songti SC",serif}.chapter-question{margin:13px 0 0;color:var(--muted)}.human-glance{margin-top:18px;padding:24px!important;border-radius:20px;background:#18201b;color:#fff}.human-glance>.answer-label{color:#ff9a70}.glance-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:1px;margin-top:16px;overflow:hidden;border-radius:14px;background:#3b443f}.glance-grid article{display:grid;align-content:start;gap:9px;padding:20px;background:#202923}.glance-grid article b{color:#8bd5b4;font-size:.78rem}.glance-grid article strong{font:700 1.18rem/1.55 Georgia,"Songti SC",serif}.glance-grid article p,.glance-grid article small{margin:0;color:#d5ddd8}.human-run{margin-top:14px;padding:22px!important;border:1px solid var(--line);border-radius:18px;background:#fafaf6}.human-run>.answer-label{display:block;margin-bottom:12px}.interaction-diagram{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:#fff}.interaction-diagram-head{display:flex;justify-content:space-between;gap:16px;padding:15px 17px;background:#18201b;color:#fff}.interaction-diagram-head b{color:#8bd5b4}.interaction-diagram-head span{color:#d5ddd8;font-size:.8rem}.interaction-roles{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important;margin:0!important;padding:0!important;list-style:none!important;counter-reset:none!important}.interaction-roles li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:9px;padding:16px!important;border:0!important;border-right:1px solid var(--line)!important}.interaction-roles li:last-child{border-right:0!important}.interaction-roles li:before{content:none!important}.interaction-roles li span{color:var(--orange);font:850 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.interaction-roles li b{color:var(--green)}.interaction-roles li p{margin:5px 0 0}.interaction-detail{padding:17px;border-top:1px solid var(--line);background:#fafaf6}.interaction-detail>b{color:var(--green)}.interaction-detail ol{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;margin:13px 0 0;padding:1px;list-style:none;background:var(--line)}.interaction-detail li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;padding:13px;background:#fff}.interaction-detail li span{color:var(--orange);font:850 10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.interaction-detail li p{margin:0}.interaction-explanation{margin-top:12px;padding:18px;border-left:5px solid var(--green);border-radius:0 14px 14px 0;background:#fff}.interaction-explanation>b{color:var(--green)}.interaction-explanation>p{margin:8px 0 14px}.interaction-explanation dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:7px 14px;margin:0}.interaction-explanation dt{color:var(--orange);font-weight:800}.interaction-explanation dd{margin:0}.visible-example{margin-top:12px;padding:18px;border-radius:14px;background:var(--orange-soft)}.visible-example>b{color:var(--green)}.visible-example .human-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin-top:10px;padding:0;counter-reset:example-step;list-style:none}.visible-example .human-list li{position:relative;padding:13px 14px 13px 42px;border-top:1px solid rgba(221,84,43,.2);counter-increment:example-step}.visible-example .human-list li:before{position:absolute;left:10px;content:counter(example-step,decimal-leading-zero);color:var(--orange);font:850 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.human-deep-dive{margin-top:12px;border:1px solid var(--line);border-radius:18px;background:#fff;overflow:hidden}.human-deep-dive>summary{display:grid;grid-template-columns:42px minmax(0,1fr) 24px;gap:15px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none}.human-deep-dive>summary::-webkit-details-marker{display:none}.human-deep-dive>summary>span{color:var(--orange);font:850 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace}.human-deep-dive>summary b,.human-deep-dive>summary small{display:block}.human-deep-dive>summary b{font-size:1.12rem}.human-deep-dive>summary small{margin-top:5px;color:var(--muted)}.human-deep-dive>summary:after{content:"+";color:var(--green);font-size:1.4rem}.human-deep-dive[open]>summary:after{content:"−"}.human-deep-dive[open]>summary{background:#fafaf6}.human-deep-body{padding:22px;border-top:1px solid var(--line)}.human-deep-body>h4{margin:26px 0 13px;font-size:1.15rem}.human-deep-body>h4:first-child{margin-top:0}.human-recap{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px;align-items:baseline;margin-top:14px;padding:18px 20px;border-radius:16px;background:var(--green-soft)}.human-recap>span{grid-row:1/3;color:var(--green);font:850 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.09em}.human-recap strong{font:750 1rem/1.55 Georgia,"Songti SC",serif}.human-recap p{margin:0;color:var(--muted);font-size:.88rem}.human-recap p b{color:var(--ink)}
+    .interaction-flow{display:grid;grid-template-columns:minmax(0,1fr) 52px minmax(0,1fr) 52px minmax(0,1fr) 52px minmax(0,1fr);align-items:stretch;padding:18px}.interaction-node{display:grid;grid-template-columns:28px minmax(0,1fr);gap:9px;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff}.interaction-node>span,.activity-node>span{color:var(--orange);font:850 10px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}.interaction-node b{color:var(--green)}.interaction-node p,.activity-node p{margin:5px 0 0}.interaction-arrow{align-self:center;width:52px;height:24px;overflow:visible}.interaction-arrow path,.activity-connector path{fill:none;stroke:var(--orange);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.activity-flow{display:grid;justify-items:center;margin-top:14px}.activity-terminal{display:grid;place-items:center;min-width:86px;padding:7px 16px;border-radius:999px;background:#18201b;color:#fff;font:850 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em}.activity-terminal.end{background:var(--green)}.activity-node{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;width:min(760px,100%);padding:16px 18px;border:1px solid var(--line);border-left:5px solid var(--green);border-radius:12px;background:#fff}.activity-connector{width:24px;height:42px;overflow:visible}
     .difficulty-card>summary div{display:grid;gap:5px}.difficulty-card>summary small{display:block;color:var(--muted);font-weight:500;line-height:1.5}.difficulty-sequence{display:grid;gap:0}.difficulty-sequence>section{display:grid;grid-template-columns:minmax(150px,.28fr) minmax(0,1fr);gap:20px;padding:18px 0!important;border-bottom:1px solid var(--line)}.difficulty-sequence>section:last-child{border-bottom:0}.difficulty-sequence b,.difficulty-footer b{color:var(--green)}.difficulty-sequence p,.difficulty-sequence ol{margin:0}.difficulty-sequence ol{padding-left:20px}.difficulty-proof{margin-top:8px;padding:14px;border-radius:12px;background:var(--orange-soft)}.difficulty-proof>summary{cursor:pointer;color:var(--green);font-weight:800}.difficulty-proof>ol{margin-bottom:0}.difficulty-footer{margin-top:14px}
     @media(max-width:560px){.mechanism-verdict{grid-template-columns:1fr;gap:5px;padding:14px}.mechanism-verdict strong{font-size:1.05rem}}
     @media(max-width:900px){.glance-grid{grid-template-columns:1fr}.interaction-roles{grid-template-columns:1fr 1fr!important}.interaction-roles li:nth-child(2){border-right:0!important}.interaction-roles li{border-bottom:1px solid var(--line)!important}.visible-example .human-list{grid-template-columns:1fr 1fr}.runtime-component-grid,.architecture-summary,.overview-boundary{grid-template-columns:1fr}.architecture-summary article:first-child{grid-column:auto}}
+    @media(max-width:900px){.interaction-flow{grid-template-columns:1fr;justify-items:center}.interaction-node{width:100%}.interaction-arrow{transform:rotate(90deg);margin:8px 0}.secondary-capabilities>header{grid-template-columns:1fr}}
     @media(max-width:900px){.engineering-structure{grid-template-columns:1fr}}
     @media(max-width:560px){.product-axis-grid{grid-template-columns:1fr}.axis-interaction ol{grid-template-columns:1fr;gap:10px}.axis-interaction li:not(:last-child):after{right:auto;top:auto;left:50%;bottom:-15px;transform:translateX(-50%) rotate(90deg)}.product-capability-group>header{grid-template-columns:1fr}.product-capability-group>header>span{grid-row:auto}.supporting-capabilities>summary{grid-template-columns:1fr}.engineering-table-wrap{overflow:visible}.engineering-layer-table,.engineering-layer-table tbody,.engineering-layer-table tr,.engineering-layer-table th,.engineering-layer-table td{display:block;width:100%;min-width:0}.engineering-layer-table thead{display:none}.engineering-layer-table tr{padding:13px;border-bottom:1px solid var(--line)}.engineering-layer-table th,.engineering-layer-table td{padding:5px 0;border:0}.engineering-layer-table td:last-child{color:var(--muted)}}
     @media(max-width:560px){.feature-thesis,.human-recap{grid-template-columns:1fr;padding:15px}.human-recap>span{grid-row:auto}.human-glance,.human-run,.human-deep-body{padding:16px!important}.interaction-diagram-head{display:grid}.interaction-roles{grid-template-columns:1fr!important}.interaction-roles li{border-right:0!important}.interaction-explanation dl{grid-template-columns:1fr;gap:3px}.interaction-explanation dd{margin-bottom:8px}.visible-example .human-list{grid-template-columns:1fr}.human-deep-dive>summary{grid-template-columns:30px minmax(0,1fr) 20px;padding:17px 15px}.difficulty-card>summary{grid-template-columns:1fr auto}.difficulty-card>summary>span{grid-column:1/-1}.difficulty-sequence>section{grid-template-columns:1fr;gap:8px}.difficulty-footer{grid-template-columns:1fr}.project-definition{grid-template-columns:1fr}.project-overview{padding-top:34px}.project-journey{grid-template-columns:1fr}.code-organization,.code-organization tbody,.code-organization tr,.code-organization th,.code-organization td{display:block;width:100%;min-width:0}.code-organization thead{display:none}.code-organization tr{padding:14px;border-bottom:1px solid var(--line)}.code-organization th,.code-organization td{padding:6px 0;border:0}}
@@ -2015,7 +2041,11 @@ def render_report(index: dict[str, Any]) -> str:
             waku_features=waku_features,
         ),
         "__ACTION_LINE__": html.escape(action_line),
-        "__FEATURE_DIRECTORY__": _render_feature_directory(display_features, modules_by_id),
+        "__FEATURE_DIRECTORY__": _render_feature_directory(
+            display_features,
+            modules_by_id,
+            tutorial_mode=is_human_report or bool(waku_features),
+        ),
         "__REFERENCE_POSITION__": _render_reference_position(
             str(project_directory), features
         ),

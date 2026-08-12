@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from .persistence import read_json_path
+from .pipeline.performance import build_pipeline_performance
+
 
 MODEL_OPTIONS = {
     "deepseek-flash": "openrouter/deepseek/deepseek-v4-flash",
@@ -84,22 +87,24 @@ def build_report_command(config: dict[str, Any]) -> list[str]:
 
 def progress_from_line(line: str, current: int) -> int:
     phases = {
-        "[report 1/6]": 8,
-        "[report 2/6]": 18,
-        "[report 3/6]": 28,
-        "[report 4/6]": 42,
-        "[report 5/6]": 88,
-        "[report 6/6]": 96,
+        "[report 01/05]": 8,
+        "[report 02/05]": 28,
+        "[report 03/05]": 58,
+        "[report 04/05]": 84,
+        "[report 05/05]": 96,
     }
     progress = current
     for prefix, value in phases.items():
         if line.startswith(prefix):
             progress = max(progress, value)
             break
-    if "模块分片目录完成" in line:
-        tail = line.split("模块分片目录完成", 1)[1].strip().split("/", 1)
+    for marker in ("业务域功能目录完成", "模块分片目录完成"):
+        if marker not in line:
+            continue
+        tail = line.split(marker, 1)[1].strip().split("/", 1)
         if len(tail) == 2 and tail[0].isdigit() and tail[1].isdigit() and int(tail[1]):
             progress = max(progress, 42 + int(30 * int(tail[0]) / int(tail[1])))
+        break
     return min(progress, 99)
 
 
@@ -115,6 +120,53 @@ class ReportJob:
     return_code: int | None = None
 
     def public(self) -> dict[str, Any]:
+        performance: dict[str, object] | None = None
+        output = self.config.get("output")
+        if isinstance(output, Path):
+            performance_path = output.with_name(f"{output.name}.performance.json")
+            if performance_path.is_file():
+                try:
+                    performance = read_json_path(performance_path)
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                    performance = None
+            linear_performance_path = output.with_name(
+                f".{output.name}.pipeline"
+            ) / "performance.json"
+            if linear_performance_path.is_file():
+                try:
+                    linear = read_json_path(linear_performance_path)
+                    performance = {
+                        **linear,
+                        "wall_duration_seconds": linear.get(
+                            "total_recorded_wall_seconds", 0
+                        ),
+                        "longest_stage": (
+                            {
+                                "id": linear.get("longest_stage"),
+                                "duration_seconds": linear.get(
+                                    "longest_stage_seconds", 0
+                                ),
+                            }
+                            if linear.get("longest_stage")
+                            else None
+                        ),
+                    }
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                    performance = None
+            if performance is None:
+                journal_path = output.with_name(f"{output.name}.run-manifest.json")
+                if journal_path.is_file():
+                    try:
+                        performance = build_pipeline_performance(
+                            read_json_path(journal_path)
+                        )
+                    except (
+                        OSError,
+                        UnicodeDecodeError,
+                        json.JSONDecodeError,
+                        ValueError,
+                    ):
+                        performance = None
         return {
             "id": self.identifier,
             "status": self.status,
@@ -126,6 +178,7 @@ class ReportJob:
             "backend": self.config["backend"],
             "model": self.config["model"] if self.config["backend"] == "opencode" else None,
             "return_code": self.return_code,
+            "performance": performance,
         }
 
 
@@ -218,9 +271,9 @@ _UI_HTML = r"""<!doctype html>
 <div class="field"><label for="key">OpenRouter API Key</label><input id="key" type="password" autocomplete="off" placeholder="未填写时读取 OPENROUTER_API_KEY"><small>不会保存在浏览器 localStorage 或服务端文件。</small></div></div>
 <div class="field"><label for="timeout">模型总超时（秒）</label><input id="timeout" type="number" min="60" max="86400" value="3600"></div>
 <p class="provider-note">报告顺序固定为：项目定位 → 产品主轴 → 业务功能 → 实现机制 → 难点与取舍 → 工程结构 → 源码证据。</p><button id="start">开始生成报告</button></form>
-<section class="panel"><div class="status"><h2>实时进度</h2><strong id="percent">0%</strong></div><div class="bar"><i id="bar"></i></div><pre class="logs" id="logs">等待任务…</pre><div class="result" id="result"></div></section></section></main>
+<section class="panel"><div class="status"><h2>实时进度</h2><strong id="percent">0%</strong></div><div class="bar"><i id="bar"></i></div><p class="provider-note" id="timing">阶段耗时：等待任务…</p><pre class="logs" id="logs">等待任务…</pre><div class="result" id="result"></div></section></section></main>
 <script>
-const form=document.querySelector('#form'),backend=document.querySelector('#backend'),opencode=document.querySelector('#opencode'),start=document.querySelector('#start'),logs=document.querySelector('#logs'),bar=document.querySelector('#bar'),percent=document.querySelector('#percent'),result=document.querySelector('#result');backend.addEventListener('change',()=>opencode.hidden=backend.value!=='opencode');document.querySelector('#source').addEventListener('input',event=>{const value=event.target.value.replace(/[\\/]+$/,'').split(/[\\/]/).pop();if(value&&!document.querySelector('#name').value)document.querySelector('#name').value=value});let timer=null;async function poll(id){const response=await fetch(`/api/jobs/${id}`),job=await response.json();bar.style.width=`${job.progress}%`;percent.textContent=`${job.progress}%`;logs.textContent=(job.logs||[]).join('\n')||'任务已启动…';logs.scrollTop=logs.scrollHeight;if(job.status==='completed'){clearInterval(timer);start.disabled=false;result.style.display='block';result.innerHTML=`完成：<a href="${job.report_uri}">打开 index.html</a><br><small>${job.output}</small>`}else if(job.status==='failed'){clearInterval(timer);start.disabled=false;result.style.display='block';result.className='result error';result.textContent=job.error||'生成失败'}}form.addEventListener('submit',async event=>{event.preventDefault();start.disabled=true;result.style.display='none';logs.textContent='提交任务…';const payload={source:document.querySelector('#source').value,output_root:document.querySelector('#output').value,name:document.querySelector('#name').value,backend:backend.value,model:document.querySelector('#model').value,api_key:document.querySelector('#key').value,model_timeout:Number(document.querySelector('#timeout').value)};const response=await fetch('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)}),data=await response.json();document.querySelector('#key').value='';if(!response.ok){start.disabled=false;result.style.display='block';result.className='result error';result.textContent=data.error||'无法启动任务';return}timer=setInterval(()=>poll(data.id),1000);poll(data.id)});
+const form=document.querySelector('#form'),backend=document.querySelector('#backend'),opencode=document.querySelector('#opencode'),start=document.querySelector('#start'),logs=document.querySelector('#logs'),bar=document.querySelector('#bar'),percent=document.querySelector('#percent'),timing=document.querySelector('#timing'),result=document.querySelector('#result');backend.addEventListener('change',()=>opencode.hidden=backend.value!=='opencode');document.querySelector('#source').addEventListener('input',event=>{const value=event.target.value.replace(/[\\/]+$/,'').split(/[\\/]/).pop();if(value&&!document.querySelector('#name').value)document.querySelector('#name').value=value});let timer=null;function timingText(performance){if(!performance)return '阶段耗时：正在建立运行账本…';const seconds=Number(performance.wall_duration_seconds||0).toFixed(1),current=performance.current_stage||'已完成',longest=performance.longest_stage;return `阶段耗时：${current} · 总墙钟 ${seconds}s${longest?` · 最慢 ${longest.id} ${Number(longest.duration_seconds||0).toFixed(1)}s`:''}`}async function poll(id){const response=await fetch(`/api/jobs/${id}`),job=await response.json();bar.style.width=`${job.progress}%`;percent.textContent=`${job.progress}%`;timing.textContent=timingText(job.performance);logs.textContent=(job.logs||[]).join('\n')||'任务已启动…';logs.scrollTop=logs.scrollHeight;if(job.status==='completed'){clearInterval(timer);start.disabled=false;result.style.display='block';result.innerHTML=`完成：<a href="${job.report_uri}">打开 index.html</a><br><small>${job.output}</small>`}else if(job.status==='failed'){clearInterval(timer);start.disabled=false;result.style.display='block';result.className='result error';result.textContent=job.error||'生成失败'}}form.addEventListener('submit',async event=>{event.preventDefault();start.disabled=true;result.style.display='none';logs.textContent='提交任务…';const payload={source:document.querySelector('#source').value,output_root:document.querySelector('#output').value,name:document.querySelector('#name').value,backend:backend.value,model:document.querySelector('#model').value,api_key:document.querySelector('#key').value,model_timeout:Number(document.querySelector('#timeout').value)};const response=await fetch('/api/jobs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)}),data=await response.json();document.querySelector('#key').value='';if(!response.ok){start.disabled=false;result.style.display='block';result.className='result error';result.textContent=data.error||'无法启动任务';return}timer=setInterval(()=>poll(data.id),1000);poll(data.id)});
 </script></body></html>"""
 
 

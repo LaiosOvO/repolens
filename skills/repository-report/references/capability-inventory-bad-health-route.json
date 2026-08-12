@@ -1,0 +1,92 @@
+{
+  "schema_version": "repo-teacher-capability-inventory/v1",
+  "grouping_complete": true,
+  "generator": {
+    "name": "bad-case-fixture",
+    "method": "complete persisted inventory with a semantic-only defect"
+  },
+  "project": {
+    "name": "health-service",
+    "path": "/workspace/health-service",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "branch": "main",
+    "analysis_fingerprint": "indexer-v1-semantic-bad-example"
+  },
+  "source_manifest_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "cache_key": "semantic-bad-health-route",
+  "validation_artifact": "capability-inventory-bad-health-route.validation.json",
+  "project_summary": {
+    "product_type": "Agent 平台",
+    "primary_actor": "运维人员",
+    "primary_outcome": "确认进程仍然存活",
+    "main_runtime": "HTTP 服务",
+    "not_the_product": [
+      "不包含用户任务、Agent 执行或业务状态变化"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "healthz",
+      "title": "健康检查接口",
+      "summary": "运维人员访问 GET /healthz 后得到固定 ok 响应。",
+      "mechanism": "无状态 HTTP 路由直接返回固定 JSON。",
+      "question": "系统怎样返回进程存活状态？",
+      "use_when": "负载均衡器需要探测进程时。",
+      "distinguish": "它只有运维探针，没有独立产品业务结果。",
+      "plain_summary": "简单来说，它就是一个固定返回 ok 的健康路由。",
+      "importance": "core-journey",
+      "user_actor": "运维人员",
+      "user_goal": "检查服务是否存活",
+      "visible_outcome": "收到固定 ok JSON",
+      "product_surface": "GET /healthz",
+      "causal_flow": "探针发请求 → 路由返回固定 JSON",
+      "why_one_capability": "单一路由独立返回响应。",
+      "implementation_modules": [
+        {
+          "path": "server/health",
+          "classification": "core",
+          "responsibility": "注册健康检查路由",
+          "handoff": "直接把固定响应交给 HTTP 客户端"
+        }
+      ],
+      "source_feature_ids": [
+        "feature_health_route"
+      ],
+      "evidence_ids": [
+        "evidence_health_route",
+        "evidence_health_handler",
+        "evidence_health_response"
+      ],
+      "source_refs": [
+        {
+          "path": "server/health/routes.go",
+          "line_start": 10,
+          "line_end": 12,
+          "claim": "注册 GET /healthz。"
+        },
+        {
+          "path": "server/health/handler.go",
+          "line_start": 5,
+          "line_end": 9,
+          "claim": "处理函数不读取任何业务状态。"
+        },
+        {
+          "path": "server/health/handler.go",
+          "line_start": 10,
+          "line_end": 13,
+          "claim": "固定返回 ok JSON。"
+        }
+      ]
+    }
+  ],
+  "module_dispositions": [
+    {
+      "path": "server/health",
+      "disposition": "core-capability",
+      "capability_ids": [
+        "healthz"
+      ],
+      "reason": "结构上完整引用该候选；它应由独立语义 reviewer 拒绝。"
+    }
+  ]
+}

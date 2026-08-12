@@ -78,6 +78,8 @@ DEFAULT_EXCLUDED_DIRS = frozenset(
         "coverage",
         ".mypy_cache",
         ".pytest_cache",
+        ".ruff_cache",
+        ".codegraph",
         "__pycache__",
         ".repo-teacher",
     }

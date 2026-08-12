@@ -1,0 +1,128 @@
+{
+  "schema_version": "repo-teacher-capability-inventory/v1",
+  "grouping_complete": true,
+  "generator": {
+    "name": "Codex",
+    "method": "repo-teacher parallel business-domain inventory"
+  },
+  "project": {
+    "name": "agent-workbench",
+    "path": "/workspace/agent-workbench",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "branch": "main",
+    "analysis_fingerprint": "indexer-v1-example"
+  },
+  "source_manifest_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "cache_key": "example-cache-key",
+  "validation_artifact": "capability-inventory.validation.json",
+  "project_summary": {
+    "product_type": "数字员工任务协作平台",
+    "primary_actor": "需要把项目工作交给 Agent 的团队成员",
+    "primary_outcome": "得到可跟踪的执行过程和最终项目产物",
+    "main_runtime": "Web 工作台、任务 API、持久化任务状态与 Worker 执行器",
+    "not_the_product": [
+      "不是单纯的聊天页面",
+      "不是健康检查和通用路由集合"
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "agent-task-execution",
+      "title": "Agent 任务提交、执行与结果回传",
+      "summary": "项目成员提交工作目标后，系统把它变成可持久化任务，由 Worker 领取执行，并持续回传事件与最终产物。",
+      "mechanism": "持久化任务状态机、Worker 领取协议和事件结果流共同形成一次完整执行。",
+      "question": "这个项目怎样把一次用户请求可靠地交给 Agent 执行并让用户持续看到结果？",
+      "use_when": "需要比较 Agent 平台的任务可靠性、执行位置和结果可观测性时。",
+      "distinguish": "它交付的是一次任务的完整生命周期，不是单独的 HTTP 路由、队列或 Worker 基类。",
+      "plain_summary": "简单来说，它就是一个从提交、排队、领取、执行到结果回传的任务状态机。",
+      "importance": "core-journey",
+      "user_actor": "项目成员",
+      "user_goal": "把项目工作交给 Agent 并持续跟踪",
+      "visible_outcome": "任务状态、执行事件和最终产物可以在工作台查看",
+      "product_surface": "项目工作台的任务面板",
+      "causal_flow": "用户提交任务 → API 持久化为 queued → Worker 领取并改为 running → Worker 执行并写事件 → completed/failed 与产物回到工作台",
+      "why_one_capability": "API、存储和 Worker 共同交付同一个用户结果；拆开会只剩内部技术模块。",
+      "implementation_modules": [
+        {
+          "path": "backend/task",
+          "classification": "core",
+          "responsibility": "创建任务并维护权威状态机",
+          "handoff": "把 queued 任务交给 Worker 领取协议"
+        },
+        {
+          "path": "backend/worker",
+          "classification": "core",
+          "responsibility": "领取任务、执行并上报事件和结果",
+          "handoff": "把进度和最终产物写回任务服务"
+        },
+        {
+          "path": "frontend/task-workbench",
+          "classification": "supporting",
+          "responsibility": "展示任务状态、事件和产物",
+          "handoff": "把用户提交交给任务 API，并消费事件流"
+        }
+      ],
+      "source_feature_ids": [
+        "feature_task_submit",
+        "feature_worker_claim"
+      ],
+      "evidence_ids": [
+        "evidence_task_create",
+        "evidence_worker_claim",
+        "evidence_result_publish"
+      ],
+      "source_refs": [
+        {
+          "path": "backend/task/service.go",
+          "line_start": 20,
+          "line_end": 86,
+          "claim": "创建任务并把初始状态持久化为 queued。"
+        },
+        {
+          "path": "backend/worker/claim.go",
+          "line_start": 15,
+          "line_end": 74,
+          "claim": "Worker 领取任务并建立运行租约。"
+        },
+        {
+          "path": "backend/worker/result.go",
+          "line_start": 30,
+          "line_end": 102,
+          "claim": "执行事件、终态和最终产物被写回任务服务。"
+        }
+      ]
+    }
+  ],
+  "module_dispositions": [
+    {
+      "path": "backend/task",
+      "disposition": "core-capability",
+      "capability_ids": [
+        "agent-task-execution"
+      ],
+      "reason": "该模块维护任务生命周期，是核心业务链的一部分。"
+    },
+    {
+      "path": "backend/worker",
+      "disposition": "core-capability",
+      "capability_ids": [
+        "agent-task-execution"
+      ],
+      "reason": "该模块实际领取并执行任务，是核心业务链的一部分。"
+    },
+    {
+      "path": "frontend/task-workbench",
+      "disposition": "supporting",
+      "capability_ids": [
+        "agent-task-execution"
+      ],
+      "reason": "该模块提供提交入口和结果展示，支撑同一业务能力。"
+    },
+    {
+      "path": "backend/health",
+      "disposition": "excluded",
+      "capability_ids": [],
+      "reason": "只提供进程存活探针，不交付独立用户业务结果。"
+    }
+  ]
+}

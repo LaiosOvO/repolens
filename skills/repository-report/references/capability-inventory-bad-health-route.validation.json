@@ -1,0 +1,23 @@
+{
+  "schema_version": "repolens-inventory-validation/v1",
+  "status": "failed",
+  "reviewer": "capability-reviewer",
+  "checks": {
+    "product_positioning": "failed",
+    "business_semantics": "failed",
+    "causal_evidence": "passed",
+    "product_coverage": "failed"
+  },
+  "reviewed_capability_ids": [
+    "healthz"
+  ],
+  "issues": [
+    {
+      "code": "business-outcome-missing",
+      "capability_id": "healthz",
+      "message": "健康探针没有独立用户业务结果，只能作为运行支撑边界。",
+      "retry_stage": "global-grouping",
+      "affected_candidate_ids": ["healthz"]
+    }
+  ]
+}

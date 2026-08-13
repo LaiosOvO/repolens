@@ -21,6 +21,8 @@
 - 视口窄于 900px 时侧栏变成顶部可展开目录；不得直接消失，也不得覆盖正文。
 - 主内容宽 940–1100px；表格和图可以局部横向滚动，页面本身不得横向溢出。
 - 每个功能章用 `.biz-fn` 容器；组件、流程、关键细节使用不同小标题色，不堆装饰卡。
+- 普通正文只允许在单词/路径边界换行，禁止在 `body`、`li`、`p` 上使用 `overflow-wrap:anywhere`。长 commit/hash 可在专用 `.commit` 内 `word-break:break-all`；行内 `code` 使用 `overflow-wrap:normal; word-break:normal; white-space:normal`，不能把 `index.html`、`scripts.start`、符号名或路径逐字符竖排。
+- 带编号的步骤列表不得让自然文本直接成为 CSS Grid 的多个匿名网格项。优先使用 `li { position:relative; padding-left:... }` + `li::before`；若使用 Grid，必须把整条步骤正文包进单一 `<div>`/`span`，并为正文设置 `min-width:0`。浏览器 QA 必须至少包含一条带两个以上行内 `code` 的步骤。
 
 ## Mermaid
 
@@ -67,6 +69,7 @@ classDef output fill:#172033,stroke:#facc15,color:#f8fafc,stroke-width:2px;
 - 每张核心图至少使用 3 种语义 class；主链和旁路从线型上可区分；
 - 节点文字和边标签可读；
 - 390px 与桌面宽度无页面级溢出；
+- 所有步骤正文占满编号右侧可用宽度；行内代码没有落入编号列、没有逐字符竖排；
 - 侧边栏链接都能定位到存在的章节，桌面端 sticky、移动端可展开；
 - 若当前环境无法实际启动浏览器，不得声称图已渲染通过，必须在交付结论中明确列为待验证。
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "仓库业务功能报告"
-  short_description: "纯 Skill 动态推导业务机制并生成技术选型报告"
-  default_prompt: "使用 $repository-report 直接分析指定源码仓库：从当前源码为每个功能建立机制指纹，按总—分—总讲清输入如何成为输出，不复用其他仓库文案；再生成高对比交互图、同类框架对比、阶段 Markdown 与带侧边栏的 HTML。"
+  short_description: "纯 Skill 闭合核心业务覆盖并深入解释源码机制"
+  default_prompt: "使用 $repository-report 直接分析指定源码仓库：先建立全量产品表面账本，确保每个核心用户结果恰好纳入或显式待核验；再从当前源码追踪配置到运行时接线，为每个功能按总—分—总讲清输入、决策、执行位置、状态、协作/集成边界与最终输出；有一手来源时客观对照同类项目实现，但不代替用户下选型结论；最后生成阶段 Markdown 与带侧边栏的 HTML。"

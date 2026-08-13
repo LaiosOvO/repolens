@@ -1,4 +1,4 @@
 interface:
   display_name: "仓库业务功能报告"
   short_description: "纯 Skill 闭合核心业务覆盖并深入解释源码机制"
-  default_prompt: "使用 $repository-report 分析指定源码仓库：先固定源码与阶段指纹，建立或增量验证 CodeGraph；用一次产品读取生成全量 surface 账本、业务功能与核心功能清单，再用共享 evidence plan 为核心功能分配关系和源码，最多三路并发写 evidence 与自然语言实现章。每章必须闭合输入、控制规则、转换/执行、状态、时序/并发、外部交接、终止和可见结果；HTML 只组装已通过 Markdown，不重新分析源码或总结。功能数量不限，不按仓库名、领域或固定段数套模板；任一功能不能在不看图时独立讲清，就不得生成 HTML。"
+  default_prompt: "使用 $repository-report 分析指定源码仓库：先固定源码与阶段指纹，建立或增量验证 CodeGraph；用一次产品读取生成全量 surface 账本、业务功能与核心功能清单，再用共享 evidence plan 为核心功能分配关系和源码，最多三路并发写 evidence 与自然语言实现章。每章先回答这个功能由谁使用、输入什么、系统完成什么、用户看到什么，再用逐跳因果账本讲底层链路；定义/配置期与运行期若分离，必须分别讲清并说明保存对象如何成为运行输入。任何中间 graph/task/run/message/event/queue 都要解释创建者、关键字段、消费者和失败边界；HTML 只组装已通过 Markdown，不重新总结。功能数量不限，不按仓库名、领域或固定段数套模板。"

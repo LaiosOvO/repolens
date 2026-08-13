@@ -15,12 +15,14 @@
 
 1. 固定 commit/branch/remote；非 Git 仓库记录目录 manifest。
 2. 先读产品声明与顶层工程树，不遍历依赖、构建产物、二进制和密钥文件。
-3. 检查 CodeGraph 索引是否存在且与当前 commit/目录 manifest 一致；不存在或过期时，用当前环境真实提供的 CodeGraph 原生接口建立/刷新索引。先读工具帮助或接口 schema，不猜命令、不伪造成功。
+3. 检查 CodeGraph 索引是否存在且与当前 commit/目录 manifest 一致；不存在或过期时，用当前环境真实提供的 CodeGraph 原生接口建立/刷新索引。先读工具帮助或接口 schema，不猜命令、不伪造成功。仓库缺索引时由执行 Skill 的 agent 自动建立，不要求用户预先安装、手工初始化或另开任务。
 4. 分别收集：用户旅程与业务对象、业务入口与可见结果、Worker/状态/集成/部署。
 
 ## CodeGraph
 
 CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须建立或复用与当前源码快照绑定的索引；当前环境没有 CodeGraph 原生能力时，写明 `unavailable` 和已尝试的接口，停在 graph 阶段，不产生谎称经过图取证的 HTML。只有用户明确允许降级时，才可用 AST/LSP/引用搜索建立透明标注的等价关系包。
+
+优先使用当前环境已经暴露的 CodeGraph MCP。只有 CLI 可用时，先读取 `codegraph --help` 与子命令帮助，再按真实版本执行等价流程：无索引运行 `codegraph init SOURCE`；已有索引运行 `codegraph status SOURCE` 后 `codegraph sync SOURCE`；最后再次运行 `status` 并用 `query/explore/node/callers/callees` 取证。若 CLI 通过 npm 提供，可以使用已安装 Node/NVM 的 `npm exec --package=@colbymchenry/codegraph -- codegraph ...`；这仍是 CodeGraph 原生索引器，不是报告生成脚本。禁止用手写 SQLite、正则或虚构统计冒充建图。
 
 `00-codegraph.md` 必须记录：源码快照 ID、索引建立/复用/刷新状态、CodeGraph 实现/版本或工具身份、支持语言、纳入/排除边界、文件/符号/关系数、未解析关系与失败、索引耗时。不得只看有无 `.codegraph/` 目录就宣称新鲜。
 

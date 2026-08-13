@@ -22,7 +22,7 @@ description: 纯 Skill 仓库讲解流水线。由当前 Codex、Claude Code 或
 完整读取 [pipeline.md](references/pipeline.md)，严格顺序执行：
 
 1. 固定源码身份并探索项目，写 `stages/00-context.md`。
-2. 以该源码快照为输入，建立、刷新或验证 CodeGraph，写 `stages/00-codegraph.md`。CodeGraph 只建立符号与关系事实，不直接判定业务功能。
+2. 以该源码快照为输入，建立、刷新或验证 CodeGraph，写 `stages/00-codegraph.md`。CodeGraph 只建立符号与关系事实，不直接判定业务功能。若仓库没有 `.codegraph/codegraph.db`，不得把“没有索引”交给用户处理：当前 agent 必须先查明本机可用的 CodeGraph 原生入口并自行建索引；有索引则先 `status` 再 `sync`，校验快照后才进入下一阶段。
 3. 写项目定位、**用户可直接体验的业务功能**、**核心功能有哪些**、核心概念和真实用户旅程到 `stages/01-project.md`。两份清单都是必写正文，不是隐含在导航、架构图或后续章节中：业务功能逐项说“用户做什么 → 系统完成什么 → 用户看见什么”；核心功能逐项说“支撑哪些业务功能 → 实现本质 → 最关键的运行判定”。
 4. 完整读取 [coverage.md](references/coverage.md)，穷举用户可见操作、持久业务对象、执行入口和外部边界，写 `stages/02-product-surfaces.md`。
 5. 将表面账本逐项归入不限数量的核心业务功能、支撑实现、排除项或未知项，写 `stages/02-capabilities.md`。
@@ -85,7 +85,7 @@ description: 纯 Skill 仓库讲解流水线。由当前 Codex、Claude Code 或
 - 每个功能的主链只叙述一次；规则表、步骤、图和状态表没有同义复述；
 - 能获得一手来源时，核心功能有同类项目实现机制对照，但没有替用户做推荐/排名结论；
 - 每个功能都有可交给编码 Agent 的实现任务地图：文件/符号、复用点、改造点、不变量和建议测试均闭合；
-- 每张 Mermaid 都实际渲染，无 `Syntax error in text`；
+- 默认每张 Mermaid 都实际渲染且无 `Syntax error in text`；若用户明确要求只看内容、跳过浏览器或优先快速生成，则只做 Mermaid 语法结构与 HTML 静态闭包检查，在 `performance.md` 和最终交付中明确标记“浏览器渲染未执行”，但不得阻止 HTML 发布；
 - 侧边栏可跳转，源码证据路径存在；
 - 输出包含阶段 Markdown、`index.html` 和 `performance.md`；
 - Skill 执行过程没有调用报告生成程序、渲染器或任何辅助脚本；CodeGraph 只负责源码关系取证，当前 agent 本体负责全部归纳、写作和 HTML 组装。

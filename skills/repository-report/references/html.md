@@ -72,7 +72,7 @@ classDef output fill:#172033,stroke:#facc15,color:#f8fafc,stroke-width:2px;
 
 每张图必须附一个纯文字“读图顺序”，即使 Mermaid 运行库不可用，读者仍能理解主链。业务交互图按“参与者 → 触发 → 核心处理 → 状态/外部系统 → 结果”组织；部署拓扑不得冒充功能运行图。
 
-发布前在真实浏览器中断言：
+默认发布前在真实浏览器中断言；若用户明确要求只评估内容、跳过浏览器或优先快速生成，则本节降级为非阻断待验收项，只执行 Mermaid 块结构、导航锚点、源码链接与 HTML 闭合的静态检查，并在 `performance.md`/最终交付如实写明未运行浏览器：
 
 - Mermaid 块数量等于 SVG 数量；
 - 页面不存在 `Syntax error in text`；

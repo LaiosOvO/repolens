@@ -3,12 +3,12 @@
 | 阶段 | 读取 | 必写产物 | 通过条件 |
 |---|---|---|---|
 | context | Git 身份、README/docs、manifest、工程树 | `00-context.md` | 项目声明、用户表面、主要模块和外部系统均出现 |
-| project | context + 少量关键源码 | `01-project.md` | 一句话本质、用户视角业务功能、核心功能自然语言总览、紧随其后的核心架构、真实旅程、前后端/调用方到运行时的交互图 |
+| project | context + 少量关键源码 | `01-project.md` | 一句话本质；非空“用户能直接体验的业务功能”清单；非空“核心功能有哪些”清单；业务↔核心映射；核心架构与真实旅程 |
 | surfaces | context + project + 用户动作/对象/执行入口 | `02-product-surfaces.md` | 六路 origin 枚举无静默截断；每个 origin exact-once 映射到有入口、状态、结果和支持边界的 surface |
 | capabilities | product surfaces + 因果关系 | `02-capabilities.md` | 功能不限量；所有 surface ID exact-once 归入/合并/支撑/排除/待核验 |
 | implementation | 单个功能 + 对应关系查询 + 核心功能同类框架官方资料 | `03-implementation/NN-*.evidence.md` 与 `.md` | 一功能一证据包一融合章节；配置到运行时接线与图前自然语言叙事闭合 |
 | engineering | context + 跨功能事实 | `04-engineering.md` | 前后端、目录、进程、Worker、数据、部署 |
-| render | 上述全部 Markdown | `05-report.md`、`index.html`、`performance.md` | 导航、图、证据、章节与待核验项闭合 |
+| render | 上述全部 Markdown | `05-report.md`、`index.html`、`performance.md` | 两份功能清单可见；每个核心功能都有图前自然语言因果叙事；导航、证据与待核验项闭合 |
 
 ## Context
 
@@ -22,6 +22,18 @@
 必须先完整读取 [coverage.md](coverage.md)并生成产品表面账本，再做能力归并。每个能力必须有独立用户价值、开始条件和可见结果；模块或页面不能单独成为功能。按用户认知顺序排序，而不是按目录顺序。
 
 覆盖单位是 `surface_id`，不是目录、模块或已生成候选。一个单体 API 模块可以包含多个独立业务生命周期；只处置模块名不能证明核心业务已覆盖。全量 surface 用于防漏，不等于全部写成核心功能；必须按 [coverage.md](coverage.md) 的核心准入门把简单 CRUD、壳页面和工程支撑合并或排除。进入 implementation 前必须核对账本总数与 exact-once 处置总数相等，且没有未解释的核心用户结果。
+
+`01-project.md` 必须实体化两份清单，禁止用“详见后文”、侧边栏链接或架构图代替：
+
+```markdown
+## 用户能直接体验的业务功能
+1. **{用户目标}**：{在哪里提交什么}；{系统实际完成什么}；{用户看见什么}；{当前边界}。
+
+## 核心功能有哪些
+1. **{核心功能}**：支撑 {业务功能编号}；{实现本质}；{决定结果的关键规则}。
+```
+
+业务功能数、核心功能数、implementation 正文数必须在 `05-report.md` 顶部记录。核心功能数与 implementation 正文数不一致时停止 render。
 
 ## Implementation
 
@@ -95,6 +107,9 @@
 - 本功能的 `surface_id` 是否与产品表面账本一致，所有核心表面是否都在某一章得到结果级解释？
 - 管理面上的配置是否已追到当前执行链真正的 loader/consumer，还是只能标为元数据/目录/未知？
 - 是否把同仓库中存在但当前入口未调用的 DAG、协议、存储或外部 adapter 错写成本功能机制？
+- `01-project.md` 是否真正包含“用户能直接体验的业务功能”和“核心功能有哪些”两个非空正文章节？
+- 每个核心功能是否都在任何 Mermaid、代码链和组件表之前，用至少 3 段连续自然语言讲清一次完整执行？
+- 第一张图全部删除后，读者是否仍能回答“输入是什么、谁按什么规则处理、中间状态在哪、何时结束、结果给谁”？
 
 任一答案为否就停在 evidence 阶段，准确记录缺失源码；不要生成看似完整却无法说明实现事实的章节。
 

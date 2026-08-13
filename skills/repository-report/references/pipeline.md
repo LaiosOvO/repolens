@@ -3,10 +3,12 @@
 | 阶段 | 读取 | 必写产物 | 通过条件 |
 |---|---|---|---|
 | context | Git 身份、README/docs、manifest、工程树 | `00-context.md` | 项目声明、用户表面、主要模块和外部系统均出现 |
+| manifest | source/Skill/CodeGraph 身份 + 阶段状态 | `00-run-manifest.md` | 每阶段输入指纹、cache reason、wall time 可追溯 |
 | graph | context + 当前源码快照 + CodeGraph 原生能力 | `00-codegraph.md` | 索引与快照绑定；文件/符号/关系/未解析统计可见；不得静默跳过 |
 | project | context + 少量关键源码 | `01-project.md` | 一句话本质；非空“用户能直接体验的业务功能”清单；非空“核心功能有哪些”清单；业务↔核心映射；核心架构与真实旅程 |
 | surfaces | context + project + 用户动作/对象/执行入口 | `02-product-surfaces.md` | 六路 origin 枚举无静默截断；每个 origin exact-once 映射到有入口、状态、结果和支持边界的 surface |
 | capabilities | product surfaces + 因果关系 | `02-capabilities.md` | 功能不限量；所有 surface ID exact-once 归入/合并/支撑/排除/待核验 |
+| evidence plan | capabilities + graph + 公共运行事实 | `02-evidence-plan.md` | 公共事实单点取证；每功能关系/路径/产物边界唯一 |
 | implementation | 单个功能 + 对应关系查询 + 核心功能同类框架官方资料 | `03-implementation/NN-*.evidence.md` 与 `.md` | 一功能一证据包一融合章节；配置到运行时接线与图前自然语言叙事闭合 |
 | engineering | context + 跨功能事实 | `04-engineering.md` | 前后端、目录、进程、Worker、数据、部署 |
 | render | 上述全部 Markdown | `05-report.md`、`index.html`、`performance.md` | 两份功能清单可见；每个核心功能都有图前自然语言因果叙事；导航、证据与待核验项闭合 |
@@ -126,4 +128,4 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 
 ## 恢复与耗时
 
-每阶段开始、结束时记录 wall time 到 `performance.md`。已经存在的阶段只有在源码身份与其输入未变化、章节合同仍满足时才复用。某个功能失败时保留其他功能文件；再次执行只补失败项。不得为“变好”而重复启动模型审校。
+完整读取 [performance.md](performance.md)。每阶段开始、结束时同时更新 `00-run-manifest.md` 与最终 `performance.md`。已经存在的阶段按输入指纹局部复用；某个功能失败只补该功能，不重跑其他功能或启动语义循环。产品输入只读一轮、公共证据只查一轮、render 不重新分析源码。

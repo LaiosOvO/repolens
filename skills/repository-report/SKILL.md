@@ -19,18 +19,18 @@ description: 纯 Skill 仓库讲解流水线。由当前 Codex、Claude Code 或
 
 ## 固定顺序
 
-完整读取 [pipeline.md](references/pipeline.md)，严格顺序执行：
+完整读取 [pipeline.md](references/pipeline.md) 和 [performance.md](references/performance.md)，严格顺序执行；阶段顺序固定，但阶段内部允许合同规定的有界并发：
 
-1. 固定源码身份并探索项目，写 `stages/00-context.md`。
+1. 固定源码身份并探索项目，写 `stages/00-context.md` 与 `stages/00-run-manifest.md`。manifest 记录源码快照、Skill 合同、CodeGraph 身份、阶段指纹、缓存命中与 wall time；它是恢复入口，不是新的审校阶段。
 2. 以该源码快照为输入，建立、刷新或验证 CodeGraph，写 `stages/00-codegraph.md`。CodeGraph 只建立符号与关系事实，不直接判定业务功能。若仓库没有 `.codegraph/codegraph.db`，不得把“没有索引”交给用户处理：当前 agent 必须先查明本机可用的 CodeGraph 原生入口并自行建索引；有索引则先 `status` 再 `sync`，校验快照后才进入下一阶段。
-3. 写项目定位、**用户可直接体验的业务功能**、**核心功能有哪些**、核心概念和真实用户旅程到 `stages/01-project.md`。两份清单都是必写正文，不是隐含在导航、架构图或后续章节中：业务功能逐项说“用户做什么 → 系统完成什么 → 用户看见什么”；核心功能逐项说“支撑哪些业务功能 → 实现本质 → 最关键的运行判定”。
-4. 完整读取 [coverage.md](references/coverage.md)，穷举用户可见操作、持久业务对象、执行入口和外部边界，写 `stages/02-product-surfaces.md`。
-5. 将表面账本逐项归入不限数量的核心业务功能、支撑实现、排除项或未知项，写 `stages/02-capabilities.md`。
-6. 对每个已选功能从公开入口向下、从可见结果向上查询 CodeGraph，闭合入口 → 控制 → 执行 → 状态/外部副作用 → 结果消费者的关系链；先写完整 `.evidence.md`，再写融合讲解 `.md`。
-7. 写前后端、进程、Worker、数据与部署的 `stages/04-engineering.md`。
-8. 按“项目 → **用户能直接体验的业务功能** → **核心功能有哪些** → **核心架构** → 功能及其底层运行 → 工程地图 → 证据边界”组装 `stages/05-report.md`，再直接写单文件 `index.html`。业务功能回答“产品对外能做什么”，核心功能回答“这些结果由哪些关键机制完成”；两者必须建立显式映射，不能混成代码模块清单。任一清单缺失、核心功能数与实现章数不一致，或某核心功能在第一张图前没有完整自然语言运行叙事，就不得 render。
+3. **只做一次产品读取**：同一轮读取 README/docs、路由/命令、持久对象、Worker/自动化与外部边界，同时写 `stages/01-project.md` 和 `stages/02-product-surfaces.md`。`01-project.md` 必须包含项目定位、**用户可直接体验的业务功能**、**核心功能有哪些**、核心概念和真实用户旅程；两份清单都是正文。业务功能逐项说“用户做什么 → 系统完成什么 → 用户看见什么”；核心功能逐项说“支撑哪些业务功能 → 实现本质 → 最关键的运行判定”。完整覆盖规则见 [coverage.md](references/coverage.md)。
+4. 只从 surface 账本归并核心能力，不再次读取全仓；将每个 surface 逐项归入不限数量的核心业务功能、支撑实现、排除项或未知项，写 `stages/02-capabilities.md`。
+5. 先为全部核心功能做一次**共享证据规划**，写 `stages/02-evidence-plan.md`：记录公共运行时/状态/协议事实、每个功能的入口与结果节点、需要展开的 CodeGraph 关系、允许读取的源码路径和预期 evidence 输出。公共事实只取证一次；功能章引用该事实并补自己的差异，不重复全仓查询。
+6. 对每个已选功能从公开入口向下、从可见结果向上查询 CodeGraph，闭合入口 → 控制 → 执行 → 状态/外部副作用 → 结果消费者的关系链；先写完整 `.evidence.md`，再写融合讲解 `.md`。不同功能可并发，但最多 3 个写作单元同时运行、禁止递归分派；每个单元只能读取 evidence plan 分配的关系与源码，证据不足时才定向扩展。
+7. 写前后端、进程、Worker、数据与部署的 `stages/04-engineering.md`。必须复用 context、surface ledger 与 evidence plan 中已经确认的跨功能事实，不得为工程章再次扫描全仓。
+8. 按“项目 → **用户能直接体验的业务功能** → **核心功能有哪些** → **核心架构** → 功能及其底层运行 → 工程地图 → 证据边界”组装 `stages/05-report.md`，再直接写单文件 `index.html`。render 只能组合和排版已经通过的 Markdown，不得重新分析源码、重新概括功能或改写因果主链。业务功能回答“产品对外能做什么”，核心功能回答“这些结果由哪些关键机制完成”；两者必须建立显式映射，不能混成代码模块清单。任一清单缺失、核心功能数与实现章数不一致，或某核心功能在第一张图前没有完整自然语言运行叙事，就不得 render。
 
-每完成一个阶段就写产物并汇报耗时。阶段产物存在且源码身份未变化时先验证后复用。没有语义审校循环、自动返修循环或固定重试次数；失败时保留已完成阶段并报告准确原因。
+每完成一个阶段就原子写产物、更新 manifest 并汇报耗时。按 [performance.md](references/performance.md) 的阶段指纹逐项复用；同一源码快照不得因为 HTML、写作措辞或下游合同变化而重跑 CodeGraph、surface 或无关功能 evidence。没有语义审校循环、自动返修循环或固定重试次数；失败时保留已完成阶段并报告准确原因。
 
 ## 功能识别
 
@@ -88,6 +88,8 @@ description: 纯 Skill 仓库讲解流水线。由当前 Codex、Claude Code 或
 - 默认每张 Mermaid 都实际渲染且无 `Syntax error in text`；若用户明确要求只看内容、跳过浏览器或优先快速生成，则只做 Mermaid 语法结构与 HTML 静态闭包检查，在 `performance.md` 和最终交付中明确标记“浏览器渲染未执行”，但不得阻止 HTML 发布；
 - 侧边栏可跳转，源码证据路径存在；
 - 输出包含阶段 Markdown、`index.html` 和 `performance.md`；
+- `00-run-manifest.md` 能证明每个阶段的输入指纹、命中/重跑原因和 wall time；`02-evidence-plan.md` 能证明公共事实没有被每个功能重复查询；
+- 同一源码快照的 warm run 只重跑失效阶段；render 不读源码、不做模型二次总结；功能并发不超过 3，且没有递归子任务或一个文件一个 Agent；
 - Skill 执行过程没有调用报告生成程序、渲染器或任何辅助脚本；CodeGraph 只负责源码关系取证，当前 agent 本体负责全部归纳、写作和 HTML 组装。
 
 最终返回所有产物的绝对路径、功能数、各阶段耗时、复用项和待核验项。

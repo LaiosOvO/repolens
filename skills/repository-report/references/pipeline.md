@@ -5,7 +5,7 @@
 | context | Git 身份、README/docs、manifest、工程树 | `00-context.md` | 项目声明、用户表面、主要模块和外部系统均出现 |
 | manifest | source/Skill/CodeGraph 身份 + 阶段状态 | `00-run-manifest.md` | 每阶段输入指纹、cache reason、wall time 可追溯 |
 | graph | context + 当前源码快照 + CodeGraph 原生能力 | `00-codegraph.md` | 索引与快照绑定；文件/符号/关系/未解析统计可见；不得静默跳过 |
-| project | context + 少量关键源码 | `01-project.md` | 一句话本质；非空“用户能直接体验的业务功能”清单；非空“核心功能有哪些”清单；业务↔核心映射；核心架构与真实旅程 |
+| project | context + manifest/lockfile + 少量关键源码 | `01-project.md` | 一句话本质；两份功能清单；业务↔核心映射；核心架构；紧随其后的技术栈与依赖实现；真实旅程 |
 | surfaces | context + project + 用户动作/对象/执行入口 | `02-product-surfaces.md` | 六路 origin 枚举无静默截断；每个 origin exact-once 映射到有入口、状态、结果和支持边界的 surface |
 | capabilities | product surfaces + 因果关系 | `02-capabilities.md` | 功能不限量；所有 surface ID exact-once 归入/合并/支撑/排除/待核验 |
 | evidence plan | capabilities + graph + 公共运行事实 | `02-evidence-plan.md` | 公共事实单点取证；每功能关系/路径/产物边界唯一 |
@@ -47,6 +47,26 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 ```
 
 业务功能数、核心功能数、implementation 正文数必须在 `05-report.md` 顶部记录。核心功能数与 implementation 正文数不一致时停止 render。
+
+### 核心架构后的技术栈与依赖实现
+
+`01-project.md` 的核心架构后必须立即出现 `## 技术栈与依赖实现`。先用一段自然语言说明前端/调用方如何进入后端或本地运行时、数据与异步工作怎样承接、AI/外部服务位于哪一层；随后按当前仓库实际存在的层列出：
+
+| 层 | 关键依赖与版本/来源 | 生产入口/实际 import | 在本项目承担的职责 | 输入/输出或协议 | 与下一层怎样交接 | 使用边界 |
+|---|---|---|---|---|---|---|
+
+取证顺序固定为 `manifest/lockfile → bootstrap/import → 真实调用或注册点 → 运行结果`。依赖写进 manifest 但当前源码没有加载，只能标 `declared-only`；只在 test/build/lint 出现标 `dev/test-only`；传递依赖不得冒充项目主动选择；SDK wrapper 必须继续说明底层协议或 provider。版本优先从 lockfile/模块清单读取，无法确定时写“当前快照未锁定”，不得猜测。
+
+至少区分以下实际存在的层，不存在则明确写“不存在”，不填空洞表格：
+
+- 前端/UI 与客户端状态：框架、路由、数据请求/缓存、实时或媒体 SDK；
+- 后端/本地运行时：HTTP/RPC 框架、领域服务、Agent/工作流执行底座；
+- 数据与状态：数据库、ORM/驱动、缓存、对象存储、搜索/向量索引；
+- 通信与异步：HTTP/WebSocket/SSE/gRPC/消息队列/任务 Worker；
+- AI/Agent：模型 SDK、OpenAI-compatible 原生 HTTP、ACP/MCP/LSP 等协议及真实接线；
+- 构建与部署：语言运行时、包管理、bundler、容器/进程宿主；测试和 lint 单列为工程保障，不得写成产品运行依赖。
+
+这节回答的是“项目用什么把架构运行起来”，不是包清单或技术 logo 墙。每个关键依赖至少绑定一个当前仓库文件/符号；若一种能力是自研代码而非第三方框架，要直接写“自研”并给出控制入口。
 
 ## Implementation
 
@@ -129,6 +149,7 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 - 管理面上的配置是否已追到当前执行链真正的 loader/consumer，还是只能标为元数据/目录/未知？
 - 是否把同仓库中存在但当前入口未调用的 DAG、协议、存储或外部 adapter 错写成本功能机制？
 - `01-project.md` 是否真正包含“用户能直接体验的业务功能”和“核心功能有哪些”两个非空正文章节？
+- 核心架构后是否立即出现技术栈与依赖实现；每个关键依赖是否同时有版本/来源、实际入口、职责、协议/状态交接和使用边界，而不是只抄 manifest？
 - 每个核心功能是否都在任何 Mermaid、代码链和组件表之前，用不受段数限制的连续自然语言讲清一次完整执行？
 - 第一张图全部删除后，读者是否仍能回答“输入是什么、谁按什么规则处理、中间状态在哪、何时结束、结果给谁”？
 

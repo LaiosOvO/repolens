@@ -5,20 +5,20 @@
 | context | Git 身份、README/docs、manifest、工程树 | `00-context.md` | 项目声明、用户表面、主要模块和外部系统均出现 |
 | manifest | source/Skill/CodeGraph 身份 + 阶段状态 | `00-run-manifest.md` | 每阶段输入指纹、cache reason、wall time 可追溯 |
 | graph | context + 当前源码快照 + CodeGraph 原生能力 | `00-codegraph.md` | 索引与快照绑定；文件/符号/关系/未解析统计可见；不得静默跳过 |
-| project | context + manifest/lockfile + 少量关键源码 | `01-project.md` | 一句话本质；两份功能清单；业务↔核心映射；核心架构；紧随其后的技术栈与依赖实现；真实旅程 |
-| surfaces | context + project + 用户动作/对象/执行入口 | `02-product-surfaces.md` | 六路 origin 枚举无静默截断；每个 origin exact-once 映射到有入口、状态、结果和支持边界的 surface |
-| capabilities | product surfaces + 因果关系 | `02-capabilities.md` | 功能不限量；所有 surface ID exact-once 归入/合并/支撑/排除/待核验 |
+| project | context + manifest/lockfile + 一次仓库读取 | `01-project.md` | 一句话本质；业务/核心/系统三份清单；映射；核心架构；紧随其后的技术栈与依赖；真实旅程 |
+| entries + systems + surfaces | context + 菜单/路由/动作 + 系统注册/状态/恢复 + 六路 origin | `02-business-entries.md`、`02-system-capabilities.md`、`02-product-surfaces.md` | 业务入口 exact-once；18 系统轴逐项处置；origin exact-once；无静默截断 |
+| capabilities + catalog | 双台账 + product surfaces + 因果关系 | `02-capabilities.md`、`02-report-catalog.md` | entry/surface/system 双向闭包；功能不限量；稳定 knowledge ID 与 source files |
 | evidence plan | capabilities + graph + 公共运行事实 | `02-evidence-plan.md` | 公共事实单点取证；每功能关系/路径/产物边界唯一 |
 | implementation | 单个功能 + 对应关系查询 + 核心功能同类框架官方资料 | `03-implementation/NN-*.evidence.md` 与 `.md` | 一功能一证据包一融合章节；配置到运行时接线与图前自然语言叙事闭合 |
-| engineering | context + 跨功能事实 | `04-engineering.md` | 前后端、目录、进程、Worker、数据、部署 |
-| render | 上述全部 Markdown | `05-report.md`、`index.html`、`performance.md` | 两份功能清单可见；每个核心功能都有图前自然语言因果叙事；导航、证据与待核验项闭合 |
+| engineering | system ledger + context + 跨功能事实 | `04-engineering.md` | 适用系统能力逐项解释；前后端、目录、进程、Worker、数据、部署 |
+| render + knowledge | 上述全部 Markdown + catalog | `05-report.md`、`report.md`、`index.html`、`knowledge/*`、`performance.md` | 三份总览可见；Markdown/HTML 同源；知识 ID/源码引用/安全快照闭合 |
 
 ## Context
 
 1. 固定 commit/branch/remote；非 Git 仓库记录目录 manifest。
 2. 先读产品声明与顶层工程树，不遍历依赖、构建产物、二进制和密钥文件。
 3. 检查 CodeGraph 索引是否存在且与当前 commit/目录 manifest 一致；不存在或过期时，用当前环境真实提供的 CodeGraph 原生接口建立/刷新索引。先读工具帮助或接口 schema，不猜命令、不伪造成功。仓库缺索引时由执行 Skill 的 agent 自动建立，不要求用户预先安装、手工初始化或另开任务。
-4. 分别收集：用户旅程与业务对象、业务入口与可见结果、Worker/状态/集成/部署。
+4. 分别收集：用户旅程与业务对象；各平台菜单/路由/动作叶子；业务入口与可见结果；18 系统审计轴的注册/状态/失败恢复；Worker/集成/部署。
 
 ## CodeGraph
 
@@ -32,11 +32,11 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 
 ## Capabilities
 
-必须先完整读取 [coverage.md](coverage.md)并生成产品表面账本，再做能力归并。每个能力必须有独立用户价值、开始条件和可见结果；模块或页面不能单独成为功能。按用户认知顺序排序，而不是按目录顺序。
+必须先完整读取 [coverage.md](coverage.md)，生成业务入口、系统能力和产品表面三份账本，再做能力归并。每个业务能力必须有独立用户价值、开始条件和可见结果；模块或页面不能单独成为功能。按用户认知顺序排序，而不是按目录顺序。
 
-覆盖单位是 `surface_id`，不是目录、模块或已生成候选。一个单体 API 模块可以包含多个独立业务生命周期；只处置模块名不能证明核心业务已覆盖。全量 surface 用于防漏，不等于全部写成核心功能；必须按 [coverage.md](coverage.md) 的核心准入门把简单 CRUD、壳页面和工程支撑合并或排除。进入 implementation 前必须核对账本总数与 exact-once 处置总数相等，且没有未解释的核心用户结果。
+覆盖单位包括 `entry_id`、`surface_id` 和 `system_capability_id`，不是目录、模块或已生成候选。一个页面或单体 API 可以包含多个动作，一个通用模块也可能承载多个系统不变量；只处置模块名不能证明覆盖。进入 implementation 前必须核对三份账本、18 轴、双向映射和 unresolved 数。
 
-`01-project.md` 必须实体化两份清单，禁止用“详见后文”、侧边栏链接或架构图代替：
+`01-project.md` 必须实体化三份清单，禁止用“详见后文”、侧边栏链接或架构图代替：
 
 ```markdown
 ## 用户能直接体验的业务功能
@@ -44,9 +44,12 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 
 ## 核心功能有哪些
 1. **{核心功能}**：支撑 {业务功能编号}；{实现本质}；{决定结果的关键规则}。
+
+## 系统核心能力
+1. **{系统能力}**：位于审计轴 {编号/名称}；支撑 {业务/核心功能编号或 platform-support}；{运行不变量、状态载体与失败恢复边界}。
 ```
 
-业务功能数、核心功能数、implementation 正文数必须在 `05-report.md` 顶部记录。核心功能数与 implementation 正文数不一致时停止 render。
+业务入口数、业务功能数、核心功能数、系统能力数和 implementation 正文数必须在 `05-report.md` 顶部记录。核心功能数与 implementation 正文数不一致、系统审计轴少于 18 或任一计数与台账不一致时停止 render。
 
 ### 核心架构后的技术栈与依赖实现
 
@@ -99,6 +102,12 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 
 每项都要附仓库相对路径、符号和行范围。核心项若源码不存在，写“源码未证明”，正文必须降级为未知；不得借 README 或竞品行为补齐当前实现。
 
+## Report catalog 与知识包
+
+capabilities 通过后写 `02-report-catalog.md`，其作用相当于可审核 TOC，但不能重新决定功能。每个条目至少包含：`knowledge_id`、类型（business/system/engineering/evidence）、标题、顺序/父级、关联 entry/surface/capability/system IDs、source files、Markdown/HTML anchor、生成状态。用户可调整标题、顺序、分组和要重点展开的项；所有未重点展开项仍必须进入覆盖附录，禁止从账本消失。
+
+render 前完整读取 [knowledge.md](knowledge.md)。把安全的起始文档复制为知识快照，生成 `source-catalog.md` 和 `knowledge/index.md`；从同一 `05-report.md` 发布 `report.md` 与 `index.html`。知识索引是后续右侧问答和 Spec/Ticket 生成的稳定检索入口，不是模型自由摘要目录。
+
 ### 机制指纹：先分类，再写第一句
 
 每个功能在 evidence 文件中先填写以下字段，不能从其他项目复制：
@@ -148,7 +157,11 @@ CodeGraph 是每个仓库的结构事实层，不是报告生成程序。必须�
 - 本功能的 `surface_id` 是否与产品表面账本一致，所有核心表面是否都在某一章得到结果级解释？
 - 管理面上的配置是否已追到当前执行链真正的 loader/consumer，还是只能标为元数据/目录/未知？
 - 是否把同仓库中存在但当前入口未调用的 DAG、协议、存储或外部 adapter 错写成本功能机制？
-- `01-project.md` 是否真正包含“用户能直接体验的业务功能”和“核心功能有哪些”两个非空正文章节？
+- `01-project.md` 是否真正包含“用户能直接体验的业务功能”“核心功能有哪些”和“系统核心能力”三个非空正文章节？
+- 是否从真实菜单/route/command registries 展开了所有业务入口叶子，并保持层级、可见条件、handler、结果和 exact-once 处置？
+- 18 个系统审计轴是否全部有状态与证据；适用系统能力是否都有消费者、失败恢复与运行边界？
+- `02-report-catalog.md` 是否只组合已闭合 ID，而没有用自由目录重新隐藏入口/系统能力？
+- `report.md`、`index.html` 和 `knowledge/index.md` 是否来自同一 catalog/Markdown，所有 knowledge ID 和源码引用都可达？
 - 核心架构后是否立即出现技术栈与依赖实现；每个关键依赖是否同时有版本/来源、实际入口、职责、协议/状态交接和使用边界，而不是只抄 manifest？
 - 每个核心功能是否都在任何 Mermaid、代码链和组件表之前，用不受段数限制的连续自然语言讲清一次完整执行？
 - 第一张图全部删除后，读者是否仍能回答“输入是什么、谁按什么规则处理、中间状态在哪、何时结束、结果给谁”？

@@ -1,6 +1,6 @@
 # 性能与恢复合同
 
-本合同只优化重复劳动，不减少产品表面、核心功能或实现证据。固定阶段仍按 `context → graph → project/surfaces → capabilities → evidence plan → implementation → engineering → render` 前进；允许并发的只有阶段内部彼此独立的功能章。
+本合同只优化重复劳动，不减少业务入口、系统能力、产品表面、核心功能或实现证据。固定阶段仍按 `context → graph → project/entries/systems/surfaces → capabilities/catalog → evidence plan → implementation → engineering → render/knowledge` 前进；允许并发的只有阶段内部彼此独立的功能章。
 
 ## 1. 三条不变量
 
@@ -31,18 +31,18 @@
 |---|---|---|
 | context | source snapshot、顶层产品声明/manifest | HTML/CSS |
 | graph | source snapshot、CodeGraph 实现/版本/配置 | 写作 Prompt |
-| project + surfaces | context、产品声明、路由/命令、持久对象、Worker/集成入口、coverage 合同 | chapter/html 合同 |
-| capabilities | surface ledger、核心准入合同 | 源码全文、HTML |
+| project + entries + systems + surfaces | context、产品声明、全部平台菜单/路由/动作、系统注册/状态/恢复、持久对象、Worker/集成、coverage 合同 | chapter/html 合同 |
+| capabilities + catalog | entry/surface/system ledgers、核心准入、catalog 合同 | 源码全文、HTML |
 | evidence plan | capabilities、CodeGraph snapshot、共享运行事实 | CSS |
 | 单个功能 evidence/正文 | capability/surface IDs、分配的源码/图节点内容、chapter 合同 | 其他无关功能、HTML |
-| engineering | context、surface、已确认公共事实 | 功能正文措辞 |
-| render | 所有已通过 Markdown 内容、html 合同 | 源码、CodeGraph、外部研究 |
+| engineering | system ledger、context、surface、已确认公共事实 | 功能正文措辞 |
+| render + knowledge | 所有已通过 Markdown、catalog、html/knowledge 合同 | 源码、CodeGraph、外部研究 |
 
 复用前只做四项轻量检查：指纹一致、产物存在、必需标题/ID 闭合、引用源码路径仍存在。不要为了验证缓存而重新做原阶段。
 
 ## 4. 一次产品读取
 
-在同一读取批次收集六路 origin，同时写 `01-project.md` 和 `02-product-surfaces.md`。先建立 origin ledger，再归并 surface；禁止为两份文件分别扫描 README、路由、页面、API 和持久对象。`02-capabilities.md` 只消费 surface ledger，不重新读源码。
+在同一读取批次展开各平台菜单/路由/动作，完成 18 系统轴，收集六路 origin，同时写 `01-project.md`、`02-business-entries.md`、`02-system-capabilities.md` 和 `02-product-surfaces.md`。禁止为四份文件重复扫描。`02-capabilities.md` 与 catalog 只消费台账，不重新读源码。
 
 ## 5. 共享证据计划
 
@@ -64,7 +64,7 @@
 
 ## 7. 零再推理 render
 
-`05-report.md` 是目录、数量、章节顺序、业务↔核心映射和待核验摘要，不再改写全部章节。`index.html` 直接采用已通过 Markdown 的标题、自然语言主链、规则表、图和证据；允许为 HTML 转义和导航生成做机械调整，禁止重新读源码或让模型再次总结同一功能。
+`02-report-catalog.md` 固定目录、knowledge ID、数量和章节顺序；`05-report.md` 只组装已通过正文。根目录 `report.md` 与 `index.html` 直接采用同一 Markdown 的标题、自然语言主链、规则表、图和证据；知识索引机械引用同一 ID。允许 HTML 转义和导航调整，禁止重新读源码或让模型再次总结。
 
 用户明确内容优先时，浏览器验收不进入关键路径；只做 HTML/锚点/Mermaid 结构检查并如实记录。视觉验收可在内容确认后单独执行。
 

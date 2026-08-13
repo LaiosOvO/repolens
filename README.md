@@ -1,6 +1,6 @@
 # RepoLens 使用说明
 
-RepoLens（CLI 命令保留为 `repo-teacher`）是一个本地代码仓库教学报告生成器。它先建立文件、符号与依赖图，再由模型把源码证据归纳成“项目定位 → 产品主轴 → 业务功能 → 端到端交互 → 底层机制 → 难点与取舍 → 工程结构 → 源码证据”，最终为每个仓库生成一个主要给人阅读的 `index.html`。
+RepoLens（CLI 命令保留为 `repo-teacher`）是一个本地代码仓库教学报告生成器。它先建立文件、符号与依赖图，再由模型把源码证据归纳成“项目定位 → 业务入口 → 业务功能 → 系统核心能力 → 端到端交互 → 底层机制 → 工程结构 → 源码证据”。产品 CLI 发布主要给人阅读的 `index.html`；纯 `$repository-report` Skill 还会发布同源 `report.md`、起始文档安全快照与 `knowledge/index.md`，供后续问答和任务生成复用。
 
 ## 生产架构
 
@@ -85,7 +85,7 @@ OUTPUT=/absolute/path/to/report
 STAGE=all
 ```
 
-只先检查功能覆盖时把 `STAGE` 改为 `capabilities`。Skill 由当前 agent 本体顺序生成阶段 Markdown 和 `index.html`，不调用 RepoLens 产品程序、渲染器或辅助脚本；CodeGraph 只用于源码关系取证。完整合同见 [`skills/repository-report/SKILL.md`](skills/repository-report/SKILL.md)。
+只先检查功能覆盖时把 `STAGE` 改为 `capabilities`。Skill 会先按平台机械枚举菜单、路由、动作、CLI/API/IPC/Worker 入口，再按 18 个审计轴盘点系统核心能力，完成双向覆盖后生成阶段 Markdown、同源 `report.md`/`index.html`、起始文档安全快照和 `knowledge/index.md`。CodeGraph 只用于源码关系取证，不能替代入口枚举。完整合同见 [`skills/repository-report/SKILL.md`](skills/repository-report/SKILL.md)。
 
 需要单独检查功能清单时，可只运行 inventory：
 

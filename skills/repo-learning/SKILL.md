@@ -15,11 +15,22 @@ description: 仓库学习报告（流水线第 1 步）。对任意代码仓库�
 - `OUTPUT`：输出根目录绝对路径（缺省时在 `SOURCE` 父目录创建 `{repository-name}-learning/`），其下为 `learning.md`、`stages/`、`screenshots/`；不要写入上游源码仓库；
 - `LANGUAGE`：默认简体中文。
 
+## 阶段零：上游热更新（每次生成都先做，产出变更报告给用户）
+
+上游仓库是活的，行号与功能账本只对快照 commit 有效。开工第一件事是拉最新源码，并**向用户汇报这次拉下来了什么**：
+
+1. **拉取**：先 `git -C SOURCE fetch origin`（网络不稳重试 1–2 次），再比较本地 HEAD 与 `origin/HEAD`；确认有新提交才 `git -C SOURCE pull --ff-only`——本地有未提交改动时**禁止 pull**，如实标注后基于本地状态继续；网络全失败时标注「上游未更新，基于本地快照 `<commit>` 继续」进入阶段一，不阻塞；
+2. **比较**：上次快照 commit（记在既有 `stages/00-context.md`；首次生成直接以当前 HEAD 为快照）与新 HEAD 比较——无新提交：留一行「上游无新提交」进入阶段一（已有 stages 基座全部复用）；有新提交：`git log <旧快照>..HEAD --oneline` + `git diff <旧快照>..HEAD --stat` 生成变更清单；
+3. **变更报告**（写 `stages/00-upstream-update.md`，并在回复中直接向用户汇报三件事）：① 新 commit 列表（哈希+标题）；② 按目录分组统计的文件变更（新增/修改/删除/改名各多少、落在哪些模块）；③ 对既有产物的影响映射——哪些 learning.md/directory-guide.md 章节需重写、哪些行号可能漂移、有无新增/删除/变更的功能。**禁止编造变更信息**：影响判断只准来自实际读取的 diff，读不出影响就写「影响未明，需复核 X」；
+4. **影响分级**（吸收 OpenDeepWiki incremental-updater 分类表）：**High**=破坏性 API 变更/新功能 → 重取证对应 `stages/03-implementation/{功能}.evidence.md` 并重写章节；**Medium**=行为/配置变更 → 更新受影响小节；**Low**=bugfix/内部重构 → 只做行号反查修复；**Skip**=纯格式/测试改动 → 不动文档（但要在变更报告里点名跳过了什么，不静默）；
+5. **增量优先（最小影响原则）**：已有产物不做全量重写——只重写受变更影响的小节与证据文件，保留未受影响内容的格式与风格；被删除的功能标「已移除」而非悄悄删节；新快照 commit 与本次变更报告登记 `stages/00-run-manifest.md`；
+6. **索引同步**：pull 到新提交后必须先 `codegraph sync SOURCE` 再进入阶段一（后续行号复核以同步后的索引为准）。
+
 ## 阶段一：取证基座（只做一遍）
 
 完整读取同仓 `skills/repository-report/references/` 下的 pipeline.md、coverage.md、chapter.md、narrative-good-bad.md、performance.md，按其合同执行（下为摘要，冲突处以那些文件为准）：
 
-1. 固定源码身份，写 `stages/00-context.md` 与 `stages/00-run-manifest.md`；
+1. 固定源码身份，写 `stages/00-context.md` 与 `stages/00-run-manifest.md`（快照 commit 必须来自阶段零 pull 后的 HEAD；非首次生成时新快照与变更报告指针登记进 00-run-manifest）；
 2. 建立/刷新/验证 CodeGraph（仓库无 `.codegraph/codegraph.db` 时自行查明本机 codegraph 入口并建索引），写 `stages/00-codegraph.md`。CodeGraph 不只是索引步骤，它是分层阅读 L0/L2/fan-in 的**执行引擎**（见下）；索引完成后跑 `codegraph status`，把节点/边规模记入 00-codegraph.md；
 3. **只做一次产品读取**（README/docs、路由/命令、持久对象、Worker、依赖清单、外部边界、**工程封装边界**：workspace 成员/子包及其作者自述），写 `stages/01-project.md` 与 `stages/02-product-surfaces.md`；md 文档是一手产品声明证据源，与代码不符处以代码为准并显式标注；
 4. surface 账本归并核心功能，写 `stages/02-capabilities.md`（每个 surface_id 恰好处置一次，禁止"取前 N 个"式静默截断）；
@@ -41,7 +52,7 @@ description: 仓库学习报告（流水线第 1 步）。对任意代码仓库�
 
 L0/L1 产出独立交付物 `OUTPUT/directory-guide.md`：目录逐个解释，**只在内部划分构成独立架构故事的模块展开**（如 core 的 tools/session、server 的 request handler 区），其余回归一句话表格；禁止把归并账本（crate→能力域→BF 映射表）当目录讲解交付。
 
-> 设计依据（对照开源同类实现的**源码精读**，详见 `docs/reference-implementations-notes.md`）：DeepWiki 系（deepwiki-open）用 embedding RAG 相似度召回，**无法保证全量覆盖**，与本 skill 的 exact-once 账本冲突，不采纳其检索路线；但其产物工程细节被吸收——`<wiki_structure>` XML 两层兜底解析、LLM 行号不可信时逐字 snippet 反查接地、页面强制 ≥5 源文件引用与 `<details>` 引用块。aider repo map（`aider/repomap.py`）的加权 PageRank 全套（边权乘数/personalization/sqrt 缩放/自环/rank 分摊回符号）被移植为 `tools/cg_rank.py`，tree-sitter 抽符号替换为 codegraph.db 直读。RepoAgent 的对象级依赖拓扑排序（叶子先做、second-best 破环）作为批量生成序合同。CodeGraph 本身就是持久化符号图，承担 aider 图构建的角色，不引入 embedding 依赖。教程产物形态再对照 PocketFlow-Tutorial-Codebase-Knowledge（每章中心用例/<10 行代码块/前文摘要续写/全抽象覆盖结构化校验）、OpenDeepWiki（catalog-generator 读者心智模型 + 右尺寸反模式；content-generator Source 引用块强制 + mermaid 语法细则 + 薄页即失败）与 lathe（先错后正/渐隐式脚手架/Ground-or-flag 的 load-bearing 限定/预测-回忆节拍/标题命名产物），其 md 效果与教学条款已固化进阶段三"md 效果质量条款"。
+> 设计依据（对照开源同类实现的**源码精读**，详见 `docs/reference-implementations-notes.md`）：DeepWiki 系（deepwiki-open）用 embedding RAG 相似度召回，**无法保证全量覆盖**，与本 skill 的 exact-once 账本冲突，不采纳其检索路线；但其产物工程细节被吸收——`<wiki_structure>` XML 两层兜底解析、LLM 行号不可信时逐字 snippet 反查接地、页面强制 ≥5 源文件引用与 `<details>` 引用块。aider repo map（`aider/repomap.py`）的加权 PageRank 全套（边权乘数/personalization/sqrt 缩放/自环/rank 分摊回符号）被移植为 `tools/cg_rank.py`，tree-sitter 抽符号替换为 codegraph.db 直读。RepoAgent 的对象级依赖拓扑排序（叶子先做、second-best 破环）作为批量生成序合同。CodeGraph 本身就是持久化符号图，承担 aider 图构建的角色，不引入 embedding 依赖。教程产物形态再对照 PocketFlow-Tutorial-Codebase-Knowledge（每章中心用例/<10 行代码块/前文摘要续写/全抽象覆盖结构化校验）、OpenDeepWiki（catalog-generator 读者心智模型 + 右尺寸反模式；content-generator Source 引用块强制 + mermaid 语法细则 + 薄页即失败；**incremental-updater 的变更影响分级表/最小影响更新/禁编造变更，已移植为阶段零热更新合同**）与 lathe（先错后正/渐隐式脚手架/Ground-or-flag 的 load-bearing 限定/预测-回忆节拍/标题命名产物），其 md 效果与教学条款已固化进阶段三"md 效果质量条款"。
 
 ## 阶段二：实跑产品与真实截图
 
@@ -93,6 +104,7 @@ L0/L1 产出独立交付物 `OUTPUT/directory-guide.md`：目录逐个解释，*
 
 ## 完成门
 
+- **热更新完成门**：若上游有新提交——`stages/00-upstream-update.md` 存在且含三件事（commit 列表/目录分组统计/产物影响映射），回复中已向用户汇报更新内容；受 High/Medium 影响的章节完成重取证与重写；行号漂移经 codegraph sync 后反查修复；跳过的 Low/Skip 项已点名；无新提交或网络失败时也留有对应记录行；
 - repository-report 的覆盖完成门适用：全部 BF/CF 都出现在第 3、4 节，无静默截断；
 - **覆盖审计通过**：对全部模块名（workspace 成员/子包）逐个 grep 计数 learning.md 与 directory-guide.md——任何 0 次出现的模块必须补讲或显式归入支撑件总表；只在分组表出现 1 次的检查是否需要升格；审计方法与结果记入 stages 账本（「顶级 BF 账本 ≠ 教程覆盖面」，两者要分别审计）；
 - 第 2 节的每条命令都实跑过或显式标注「未实跑：原因」；

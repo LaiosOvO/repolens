@@ -5,7 +5,7 @@ description: 仓库学习报告（流水线第 1 步）。对任意代码仓库�
 
 # 仓库学习报告
 
-由当前 agent 本体执行：读源码取证、实跑产品、写 MD、截图嵌入，全部由 agent 完成；不得调用任何报告生成程序或辅助脚本。
+由当前 agent 本体执行：读源码取证、实跑产品、写 MD、截图嵌入，全部由 agent 完成；不得调用任何报告生成程序或辅助脚本。（GLM 批量生成引擎条款见阶段三——它只承接**蒸馏/汇总/格式化**类机械层，且产物必须经行号反查抽检；证据责任不转移。）
 
 定位：**这份 MD 是给人学的，不是给机器存档的**。读者是一个想在 1–2 小时内搞懂这个仓库、然后自己动手写教程稿的开发者。功能覆盖必须全量，但写法是"带着学"，不是堆砌证据。
 
@@ -41,7 +41,7 @@ description: 仓库学习报告（流水线第 1 步）。对任意代码仓库�
 
 L0/L1 产出独立交付物 `OUTPUT/directory-guide.md`：目录逐个解释，**只在内部划分构成独立架构故事的模块展开**（如 core 的 tools/session、server 的 request handler 区），其余回归一句话表格；禁止把归并账本（crate→能力域→BF 映射表）当目录讲解交付。
 
-> 设计依据（对照开源同类实现的**源码精读**，详见 `docs/reference-implementations-notes.md`）：DeepWiki 系（deepwiki-open）用 embedding RAG 相似度召回，**无法保证全量覆盖**，与本 skill 的 exact-once 账本冲突，不采纳其检索路线；但其产物工程细节被吸收——`<wiki_structure>` XML 两层兜底解析、LLM 行号不可信时逐字 snippet 反查接地、页面强制 ≥5 源文件引用与 `<details>` 引用块。aider repo map（`aider/repomap.py`）的加权 PageRank 全套（边权乘数/personalization/sqrt 缩放/自环/rank 分摊回符号）被移植为 `tools/cg_rank.py`，tree-sitter 抽符号替换为 codegraph.db 直读。RepoAgent 的对象级依赖拓扑排序（叶子先做、second-best 破环）作为批量生成序合同。CodeGraph 本身就是持久化符号图，承担 aider 图构建的角色，不引入 embedding 依赖。教程产物形态再对照 PocketFlow-Tutorial-Codebase-Knowledge（每章中心用例/<10 行代码块/前文摘要续写/全抽象覆盖结构化校验）与 OpenDeepWiki（catalog-generator 读者心智模型 + 右尺寸反模式；content-generator Source 引用块强制 + mermaid 语法细则 + 薄页即失败），其 md 效果条款已固化进阶段三"md 效果质量条款"。
+> 设计依据（对照开源同类实现的**源码精读**，详见 `docs/reference-implementations-notes.md`）：DeepWiki 系（deepwiki-open）用 embedding RAG 相似度召回，**无法保证全量覆盖**，与本 skill 的 exact-once 账本冲突，不采纳其检索路线；但其产物工程细节被吸收——`<wiki_structure>` XML 两层兜底解析、LLM 行号不可信时逐字 snippet 反查接地、页面强制 ≥5 源文件引用与 `<details>` 引用块。aider repo map（`aider/repomap.py`）的加权 PageRank 全套（边权乘数/personalization/sqrt 缩放/自环/rank 分摊回符号）被移植为 `tools/cg_rank.py`，tree-sitter 抽符号替换为 codegraph.db 直读。RepoAgent 的对象级依赖拓扑排序（叶子先做、second-best 破环）作为批量生成序合同。CodeGraph 本身就是持久化符号图，承担 aider 图构建的角色，不引入 embedding 依赖。教程产物形态再对照 PocketFlow-Tutorial-Codebase-Knowledge（每章中心用例/<10 行代码块/前文摘要续写/全抽象覆盖结构化校验）、OpenDeepWiki（catalog-generator 读者心智模型 + 右尺寸反模式；content-generator Source 引用块强制 + mermaid 语法细则 + 薄页即失败）与 lathe（先错后正/渐隐式脚手架/Ground-or-flag 的 load-bearing 限定/预测-回忆节拍/标题命名产物），其 md 效果与教学条款已固化进阶段三"md 效果质量条款"。
 
 ## 阶段二：实跑产品与真实截图
 
@@ -63,7 +63,7 @@ L0/L1 产出独立交付物 `OUTPUT/directory-guide.md`：目录逐个解释，*
 7. **值得讲的点**：3–5 个候选选题，每个含核心知识点、主比喻候选、三个展开场景、演示案例、坑候选、可用素材清单（指向已有截图/证据文件）——这一节是给后续写视频稿（repo-script）留的选材口；
 8. **证据边界**：没覆盖到的、跑不起来的、需要用户核验的，如实列出。
 
-### md 效果质量条款（对照 PocketFlow-TCK / OpenDeepWiki 源码精读，全部条款通用、不针对特定仓库）
+### md 效果质量条款（对照 PocketFlow-TCK / OpenDeepWiki / lathe 源码精读，全部条款通用、不针对特定仓库）
 
 **读者心智模型**：章节与功能编排按使用者旅程和心智模型组织，不按文件树平铺；「把多个独立能力藏进一个超大章 = 失败，哪怕那章很长」——定稿前逐节自检：本节是否合并了 deserving 单独成节的独立能力？是则拆分。
 
@@ -79,13 +79,25 @@ L0/L1 产出独立交付物 `OUTPUT/directory-guide.md`：目录逐个解释，*
 
 **语言纪律**：正文用目标语言，代码标识符（变量/函数/类名、文件路径、配置键、API 端点、命令行参数）保持原文不翻译。
 
+**先错后正**（lathe 同款教学法）：引入每个关键机制时，优先展示"诱人但错误"的用法或直觉（读者自己会踩的那种），一句话点破问题，再给正确做法——让读者*感受*修复的必要性，不是被告知。适用于坑与边界段；不适用于纯声明式配置项。
+
+**渐隐式讲读**（lathe faded scaffolding 移植）：讲读代码不逐行平铺——第一个代码块完全给全并逐行讲（复制即理解）；随后同模式的出现处改为点名接缝（"在 `X` 函数、`Y` 循环之后："）+ 指出与已讲模式的差异点，让读者带着模式去看下一实例。恰好比读者已会的多走一步，不重复铺陈。
+
+**Ground-or-flag 的 load-bearing 限定**（细化既有来源合同）：行号接地铁律不变，但补充 lathe 的适用范围划分——只有 **load-bearing 事实**（读者会照做、错了会浪费真实时间的：命令默认值、签名、行号、版本号、语义保证）才强制「有源码/实跑证据，否则删除或标注待核」；普通背景性描述要么确认要么删除，**不许满页 hedge**。`[待核：查什么]` 只用于 load-bearing 未知，不做装饰性免责。
+
+**标题命名产物**（lathe 同款）：核心功能小节与学习路径的章节标题必须说清"本节读完你能搞懂什么/看到什么"（如"多 agent 协作时 session 状态存在哪"），禁止"Step 1: 概览"式空标题。禁开场白：小节首句禁止"在本节中我们将…"，直接以痛点/用例/反直觉断言开场。
+
+### GLM 批量生成引擎条款（可选，凭据就绪时启用）
+
+批量、结构化、语义风险低的重复生成任务（L2 公开合同蒸馏、directory-guide 目录一句话表、覆盖审计报告）可用 `tools/glm_call.py` 调 GLM coding plan 的 glm-5.3（OpenAI 兼容端点 `api.z.ai/api/coding/paas/v4`，`ZAI_API_KEY` 环境变量，`reasoning_effort=low/high`——thinking 不可关闭，批量任务不使用默认 max）。**分工合同**：GLM 只做蒸馏/汇总/格式化等机械层，**证据与行号仍由 agent 接地**——GLM 产物必须经行号反查抽检后才可写入 stages 账本；exact-once 账本、覆盖审计、因果链闭合仍由 agent 全责。缓存按 prompt+model+effort 哈希落盘（断点续跑）；跑批选积分 5 折的非高峰时段（工作日 14:00–18:00 之外）。GLM 不可用时不阻塞管线——降级为 agent 逐项执行。
+
 ## 完成门
 
 - repository-report 的覆盖完成门适用：全部 BF/CF 都出现在第 3、4 节，无静默截断；
 - **覆盖审计通过**：对全部模块名（workspace 成员/子包）逐个 grep 计数 learning.md 与 directory-guide.md——任何 0 次出现的模块必须补讲或显式归入支撑件总表；只在分组表出现 1 次的检查是否需要升格；审计方法与结果记入 stages 账本（「顶级 BF 账本 ≠ 教程覆盖面」，两者要分别审计）；
 - 第 2 节的每条命令都实跑过或显式标注「未实跑：原因」；
 - 每个核心功能小节有 `文件:行号` 证据；数字有来源，无来源数字已删除或改定性描述；
-- **md 效果条款自检**：逐核心功能节核对——有中心用例贯穿？代码块 <10 行或已拆段+紧跟解释？非首节有上节回顾+互链？mermaid 过语法细则（ID 防撞/标签引号/图型选型）且反映真实结构？无"标题+一句话"薄节？
+- **md 效果条款自检**：逐核心功能节核对——有中心用例贯穿？代码块 <10 行或已拆段+紧跟解释？非首节有上节回顾+互链？mermaid 过语法细则（ID 防撞/标签引号/图型选型）且反映真实结构？无"标题+一句话"薄节？小节标题说清产出、首句非"在本节中我们将"？讲读有先错后正或接缝点名（不逐行平铺）？load-bearing 事实全接地、无装饰性 hedge？
 - 截图全部是真实运行截图，路径有效、有来源标注；没有任何"页面自拍"式验收截图嵌进 MD；
 - 产物清单：`learning.md`、`directory-guide.md`、`stages/`、`screenshots/`；
 - 最终返回 `learning.md` 绝对路径、功能数、证据条数、截图清单、未实跑项与各阶段耗时。

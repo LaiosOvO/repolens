@@ -160,10 +160,48 @@
 5. **读者心智模型**：目录/功能编排按使用者旅程而非文件树；「把多个独立能力藏进一章 = 失败」反模式自检；
 6. **薄页禁令**：每个核心功能小节至少有中心用例+逐跳因果+边界坑；只有标题式一句话的小节必须合并或深化。
 
-## 十、遗留 / 下一步
+## 十、lathe 精读（devenjarvis/lathe，808★，HN 320+，2026-08-24 追加）
+
+形态与我们同构：**skill + CLI**（7 个 skill：lathe 主 skill / ask / extend / tag / verify / voice / work，Go CLI 负责 store/serve）。它做「任意主题→动手教程」，不限于代码库，但教学法合同是六家参考里最完整的。主 skill 415 行 + verify skill 49 行已存 `参考实现/lathe/`。
+
+### 与众不同的机制
+
+1. **Ground-or-flag 铁律**（主 skill :177）：每个 load-bearing 事实（数字/默认值/签名/语义保证）只有两个归宿——读了源并内联引用，或 `[!UNVERIFIED]` callout 标注「查什么」。「我相当确定是 X」= flag 而非 fact。与我们的行号接地同源，但它把适用范围限定到 *load-bearing*（读者会照做、错了会浪费真实时间的），普通背景知识要么确认要么删除，不许满页 hedge——这比我们「无来源数字已删除」的合同更精细。
+2. **先错后正**（:171）：介绍概念时先展示诱人但错误（tempting-but-broken）的用法，一句话吐槽，再给修复版。读者要*感受*到修复的必要性，不是被告知。
+3. **渐隐式脚手架**（:303）：每部分第一个代码块完全给全（复制即跑），最后一两个代码块变成「填缝」——指出接缝位置（"Inside `process_buffer`, just after the voices loop:"），让读者照已见模式写下一实例。恰好比读者已会的多走一步。
+4. **预测/回忆节拍**（:196-221）：跑 Checkpoint 前 `[!PREDICT]` 让读者先承诺预期输出；Part N≥2 开头 `[!RECALL]` 一个问题迫使重建而非再认。检索练习的制度化。
+5. **标题命名产物**（:72）：禁用 "Step 1: Setup"，章节标题必须说清本章*做出什么*（"A scanner that recognises one-character tokens"）。
+6. **禁开场白清单**（:142）："In this tutorial, we will…" 等 5 种首句被明令禁止，给了 4 种合格开场（具体场景/值得核查的断言/题记/读者困惑陈述）。
+7. **版本锁定**（:22-44）：动笔前探测并*与读者确认*工具链版本，版本成为行文的约束——版本敏感的事实必须锚定到锁定版本。对位我们的「行号只对快照 commit 有效」。
+8. **Pre-store gate**（:327-351）：存库前强制声明 5 组元数据（repo/versions/tags/sources/voice/model），「省略且不说明理由」不允许——把元数据完整性做成显式门。对位我们的完成门。
+9. **verify 独立 skill**（49 行）：像读者一样在 `mktemp -d` 干净目录逐 part 执行，Checkpoint 命令+代码块是可执行面，教学习/来源类 callout 跳过；结果三态 verified/skipped/failed——**skipped（缺工具链）≠ failed（教程真坏）**，状态只由 skill 写不经 UI 按钮。
+10. **教学法不变量 vs 风格可分离**（:150-164）：substance/pedagogy 是 voice 无关不变量，voice 只控制语气；voice 永远不能放松准确性/引用/验证规则。
+
+### 吸收判断
+
+- **吸收**：Ground-or-flag 的 load-bearing 限定（细化我们的来源合同）、先错后正、渐隐式脚手架（learning.md 的代码讲读适用）、标题命名产物、预测/回忆节拍（报告 HTML 交互可用）、verify 三态语义（skipped≠failed 对位我们的「跑不起来如实列出」）。
+- **不适用**：仅写 Part 1 / lathe store CLI / voice 系统（我们是单文件深报告不是连载）；版本锁定流程保留精神（快照 commit 已是等价物）。
+
+## 十一、GLM coding plan 接入调研（2026-08-24）
+
+用户指示用 GLM coding plan 的 glm-5.3 做批量生成引擎。接入方式（Z.ai 官方，三端点）：
+
+| 工具形态 | base_url | 备注 |
+|---|---|---|
+| OpenAI 兼容（通用批量调用首选） | `https://api.z.ai/api/coding/paas/v4` | `/chat/completions`，model=`glm-5.3` |
+| Anthropic 兼容（Claude Code 用） | `https://api.z.ai/api/anthropic` | Sonnet/Opus 槽位映射 |
+| Codex | `https://api.z.ai/api/v1` | reasoning.effort → low/high/max |
+
+关键参数：`glm-5.3[1m]` 后缀开 1M 上下文（需配 AUTO_COMPACT_WINDOW=1000000）；thinking 不可关闭只能调 `reasoning_effort`（low/high/max，默认 max，批量任务建议 low/high）；**peak 外时段（周一至周五 14:00-18:00 UTC+8 之外）积分 5 折**——批量跑批选夜间。Coding Plan 限官方支持工具调用，普通 OpenAI SDK 走 coding/paas/v4 端点即可带 Bearer key 直调（批量生成属 coding 用途）。
+
+**凭据现状**：本机全盘查过（zshrc/zshenv/history/Codex config/Claude settings/keychain/`~/.codex/aivr-api-key.txt`）无 z.ai key——待用户提供 ZAI_API_KEY。
+
+## 十二、遗留 / 下一步
 
 - [ ] cg_rank.py 在 codex 仓的实测结果核对（跑完后把 TOP 文件/符号 vs 手工选的 L3 清单对比）；
 - [ ] networkx/numpy 已装入 workbuddy venv（envs/default），SKILL.md 引用工具路径；
 - [ ] RepoAgent 完整 tarball 因网络限速未拉全（core 目录部分缺），但关键机制（拓扑序/环处理/增量）已从已解压部分取齐；
 - [ ] deepwiki 的「页面强制 ≥5 源文件引用 + `<details>` 引用块」是否吸收进报告章节合同——OpenDeepWiki 的 Source 引用块格式已吸收，≥5 源文件下限待定；
-- [ ] OpenDeepWiki 的 mindmap-generator.md（181 行）与 Graphify 工件尚未精读（优先级低，wiki 布局产物，与 repolens 教学产物形态不同）。
+- [ ] OpenDeepWiki 的 mindmap-generator.md（181 行）与 Graphify 工件尚未精读（优先级低，wiki 布局产物，与 repolens 教学产物形态不同）；
+- [ ] **GLM glm-5.3 接入**：等用户提供 ZAI_API_KEY 后，用 `tools/glm_call.py`（OpenAI 兼容端点）替换 PocketFlow 式手工逐章生成，批量跑批选积分 5 折的夜间时段；
+- [ ] lathe 的「先错后正 / 渐隐式脚手架 / 预测-回忆节拍」是否进 repo-script（视频稿）skill 的讲读节奏合同——教学法条款与教学报告 skill 分开评估。

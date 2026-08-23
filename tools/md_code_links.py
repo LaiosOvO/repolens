@@ -204,19 +204,22 @@ def rewrite(text: str, md_file: Path, resolver: Resolver,
     linked_spans = [(m.start(), m.end()) for m in LINKED_RE.finditer(text)]
     codespan_spans = [(m.start(), m.end()) for m in CODESPAN_RE.finditer(text)]
 
-    def blocked(pos: int) -> bool:
+    def blocked(pos: int, *, codes: bool = True) -> bool:
         if mask[pos] == "#":
             return True
-        return any(s <= pos < e for s, e in linked_spans + codespan_spans)
+        spans = linked_spans + (codespan_spans if codes else [])
+        return any(s <= pos < e for s, e in spans)
 
-    # 轮 1：反引号引用（可无行号）
+    # 轮 1：反引号引用（可无行号）。
+    # 注意：不查 codespan 掩码——轮 1 的匹配本身就从反引号开始，查了必然自杀；
+    # 已成链接的（[...](...)）由 linked_spans 拦截；代码围栏由 mask 拦截。
     hits: list[tuple[int, int, str, str]] = []  # start, end, ref, anchor_raw
     for m in REF_RE.finditer(text):
-        if blocked(m.start()):
+        if blocked(m.start(), codes=False):
             continue
         hits.append((m.start(), m.end(), m.group(1), ""))
-    # 轮 2：裸引用（必须带行号）。REF_RE 命中过的不重复（codespan 掩码排除）。
-    codespan_pos = 0
+    # 轮 2：裸引用（必须带行号）。反引号区间的 lookbehind 已排除，
+    # codespan 掩码再兜底一次（防 REF_RE 未覆盖的形态）。
     for m in PLAIN_RE.finditer(text):
         s, e = m.start(1), m.end(2)
         if blocked(m.start(1)):

@@ -54,6 +54,15 @@ L0/L1 产出独立交付物 `OUTPUT/directory-guide.md`：目录逐个解释，*
 
 > 设计依据（对照开源同类实现的**源码精读**，详见 `docs/reference-implementations-notes.md`）：DeepWiki 系（deepwiki-open）用 embedding RAG 相似度召回，**无法保证全量覆盖**，与本 skill 的 exact-once 账本冲突，不采纳其检索路线；但其产物工程细节被吸收——`<wiki_structure>` XML 两层兜底解析、LLM 行号不可信时逐字 snippet 反查接地、页面强制 ≥5 源文件引用与 `<details>` 引用块。aider repo map（`aider/repomap.py`）的加权 PageRank 全套（边权乘数/personalization/sqrt 缩放/自环/rank 分摊回符号）被移植为 `tools/cg_rank.py`，tree-sitter 抽符号替换为 codegraph.db 直读。RepoAgent 的对象级依赖拓扑排序（叶子先做、second-best 破环）作为批量生成序合同。CodeGraph 本身就是持久化符号图，承担 aider 图构建的角色，不引入 embedding 依赖。教程产物形态再对照 PocketFlow-Tutorial-Codebase-Knowledge（每章中心用例/<10 行代码块/前文摘要续写/全抽象覆盖结构化校验）、OpenDeepWiki（catalog-generator 读者心智模型 + 右尺寸反模式；content-generator Source 引用块强制 + mermaid 语法细则 + 薄页即失败；**incremental-updater 的变更影响分级表/最小影响更新/禁编造变更，已移植为阶段零热更新合同**）与 lathe（先错后正/渐隐式脚手架/Ground-or-flag 的 load-bearing 限定/预测-回忆节拍/标题命名产物），其 md 效果与教学条款已固化进阶段三"md 效果质量条款"。
 
+### 官方文档语义层条款（2026-08-24 固化；起因：loopx 教程漏掉官方产品语言被用户指出）
+
+**docs/ 是语义层第一来源，不是可跳过的非源码资产**。生成任何教学产物前，必须先通读仓库官方文档——仓内 `docs/`（尤其 product/concepts/vision/protocols 类子目录）、README 衍生文档、官网/用户手册（如飞书 wiki 等外部官方载体，可用浏览器抓取）。只蒸馏代码索引会得到「工程结构正确但产品语义全空」的报告——用户拿官方手册一对就露馅。
+
+1. **术语对齐义务**：官方文档用来命名产品能力的词（定位语、能力场景名、架构层名如 kernel/domain state、产品第一屏问题清单）必须出现在教程里，且与源码对得上——每个官方概念找到源码对应物（模块/协议文件/命令）并给 `文件:行号`；找不到对应物的官方概念显式标注「文档声明、源码未见」；
+2. **docs/ 目录分类**：阅读路径与模块账本中 docs/ 的教学价值一律标「极高（官方产品语义层）」或按子目录分级，禁止整体归入「非源码资产·跳过」；
+3. **文档语言 vs 代码事实**：官方手册的宣称（如实证数字、竞品对比）引用时标注来源（手册章节/文档路径），代码可验证的部分单独给源码证据，两者不混写；
+4. **外部官方载体抓取**：飞书/Notion/官网等 JS 渲染页用 ego-browser 滚动逐屏收集（虚拟化渲染滚到哪渲染哪，按 data-block-id 去重累积），普通 HTTP 抓取只拿得到标题。
+
 ## 阶段二：实跑产品与真实截图
 
 7. 产品可运行时（CLI / 桌面应用 / Web 可本地起服务），实跑核心功能：安装、最小可用示例、1–2 个代表性命令或操作流程；

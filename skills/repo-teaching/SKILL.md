@@ -1,6 +1,6 @@
 ---
 name: repo-teaching
-description: 仓库教学流水线（repository-report 与 repo-tutorial-script 的融合版）。对任意代码仓库只做一次源码取证与产品表面覆盖，随后同源产出两份成品：仓库讲解报告（业务功能 + 逐跳因果证据 + 工程地图，Markdown + 单文件 HTML）和可直接口播的视频教程稿件（痛点钩开场、生活化比喻、数字清单、口述演示、避坑清单、三点式收尾，Markdown + 提词器 HTML）；两份 HTML 都用 ego-browser 实机验收并保留截图。当用户要求"给仓库出报告和教程稿件""生成仓库讲解 + 视频脚本"时使用。
+description: 仓库教学流水线（repository-report 与 repo-tutorial-script 的融合版）。对任意代码仓库只做一次源码取证与产品表面覆盖，随后同源产出四份成品：仓库讲解报告（业务功能 + 逐跳因果证据 + 工程地图，Markdown + 单文件 HTML）、可直接口播的视频教程稿件（痛点钩开场、生活化比喻、数字清单、口述演示、避坑清单、三点式收尾，Markdown + 提词器 HTML）、分镜交接稿（storyboard.md，供 Remotion/HyperFrames 渲染成片）和投稿发布物料（publish.md：标题三版、封面文案、简介、三层标签、分段时间轴、置顶评论，合同见 references/publish-kit.md）；两份 HTML 都用 ego-browser 实机验收并保留截图。当用户要求"给仓库出报告和教程稿件""生成仓库讲解 + 视频脚本 + 发布物料"时使用。
 ---
 
 # 仓库教学流水线
@@ -44,12 +44,20 @@ description: 仓库教学流水线（repository-report 与 repo-tutorial-script 
 11. **写稿**，写 `script/manuscript.md`（系列稿为 `script/ep{N}-{主题}.md` + `script/00-系列大纲.md`）：严格按 [style-recipes.md](references/style-recipes.md) 选定 STYLE 的配方；口播稿全文口语短句，命令配中文读法；所有命令/配置/路径必须与证据基座一致；
 12. **稿件质量门**，写 `script/stages/02-quality-check.md`：逐项过 [quality-gates.md](references/quality-gates.md)，不过则回改，最多返修 2 轮；
 13. **提词器渲染**：把通过的稿件写成自包含 `script/index.html`（大字号正文、分节锚点导航、命令/配置代码样式高亮；只排版不改写）。
+14. **分镜交接稿**：按 [storyboard.md](references/storyboard.md) 把通过的稿件拆成场景表，写 `script/storyboard.md`（系列稿每集一份）；口播原文逐字取自稿件不改写，强调元素与素材列对齐证据基座与已有实拍截图，缺素材的场景显式标「待补拍」。
+15. **发布物料**：把通过质量门的稿件转成投稿物料，写 `script/publish.md`（系列稿每集一份），字段合同见 [publish-kit.md](references/publish-kit.md)：标题三版（痛点利益/反直觉/数字清单）、封面文案（主标/副标/角标）、简介五段、三层标签、分段时间轴（各节字数 ÷ 400–430 字/分钟换算，并与稿件预估总时长一致）、置顶评论（含经 `stages/00-context.md` 核验的仓库地址与 commit 快照）；只从稿件与证据基座取材，禁止新增事实，标题/简介/封面引用的数字必须与稿件正文一致。
+
+### 覆盖完整性门（防"只讲了一个点"）
+
+- **报告必须全量**：全部 BF/CF 都出现在报告里；被合并/支撑/排除的 surface 必须在覆盖账本中点名，禁止"取前 N 个"式静默截断。
+- **稿件侧显性规划**：`EPISODE=single` 时，`script/stages/01-spine.md` 末尾必须列「本集未覆盖的核心功能清单 + 建议的系列分集表」；当核心功能（CF）数 > 6 时默认改用 `EPISODE=series`，系列大纲必须把**每个 CF 分配到具体集数**，不允许任何 CF 无归属。
 
 ## 阶段四：ego-browser 实机验收（两份 HTML 都过）
 
-14. 用 ego-browser heredoc（`ego-browser nodejs <<'EOF'`）开专用任务空间（如 `repo-teaching 验收 {仓库名}`），依次打开 `report/index.html` 和 `script/index.html`：
+16. 用 ego-browser heredoc（`ego-browser nodejs <<'EOF'`）开专用任务空间（如 `repo-teaching 验收 {仓库名}`），依次打开 `report/index.html` 和 `script/index.html`：
     - 用 `js()` 验证：侧边栏/锚点导航零断链、全部章节渲染完整、Mermaid 无 `Syntax error in text`（报告）、无 console 报错——以 DOM 检查为准，不凭截图猜；
-    - `captureScreenshot` 截图存 `OUTPUT/screenshots/`：报告首屏 + 核心功能章至少 3 张；稿件首屏 + 导航 + 至少 3 个核心章节（系列稿加大纲页）；文件名标注产物与验证点（如 `report-ch03.png`、`script-nav.png`）；截图超时则改用 js() DOM 验证并在记录中注明；
+    - `captureScreenshot` 截图存 `OUTPUT/screenshots/`：报告首屏 + 核心功能章至少 3 张；稿件首屏 + 导航 + 至少 3 个核心章节（系列稿加大纲页）；文件名标注产物与验证点（如 `report-ch03.png`、`script-nav.png`）；截图超时则改用 js() DOM 验证并在记录中注明（滚动后黑帧时用 `captureBeyondViewport:true` + clip 绕过）。**验收截图只作证据存档，不嵌入产物 HTML**；产物里允许嵌的只有「产品真实运行截图/录屏」，且必须标注实拍来源；
+    - 产品可运行时（CLI/桌面应用/Web 可本地起服务），尽量实跑核心功能并用真实运行截图支撑稿件的演示场景；跑不起来（缺账号/密钥/授权）如实记录前提，不得用产物 HTML 的截图冒充产品截图；
     - 验证记录写 `stages/05-browser-check.md`（每份 HTML 的验证项、结果、截图路径、问题），完成后 `completeTaskSpace(name, { keep: false })`；
     - 未过项回对应阶段修复重验；ego-browser 不可用不得跳过，如实报告。
 
@@ -57,7 +65,8 @@ description: 仓库教学流水线（repository-report 与 repo-tutorial-script 
 
 - repository-report 完成门全部适用产物 A（见该 skill 的"完成门"清单）；
 - [quality-gates.md](references/quality-gates.md) 全部适用产物 B；
-- 报告与稿件的事实陈述一致（同一证据基座），数字、命令、路径在两份产物中不打架；
+- [publish-kit.md](references/publish-kit.md) 的质量门全部适用发布物料（数字与稿件三场景一致、标题/简介/封面三方数字不打架、字数上限达标）；
+- 报告、稿件与发布物料的事实陈述一致（同一证据基座），数字、命令、路径在各产物间不打架；
 - 两份 HTML 均通过 ego-browser 验收，截图齐备；
-- manifest 能证明源码只取证一遍；产物清单：`stages/`、`report/report.md` + `report/index.html`、`script/manuscript.md` + `script/index.html`、`screenshots/`、`stages/05-browser-check.md`；
+- manifest 能证明源码只取证一遍；产物清单：`stages/`、`report/report.md` + `report/index.html`、`script/manuscript.md` + `script/index.html`、`script/storyboard.md`、`script/publish.md`、`screenshots/`、`stages/05-browser-check.md`；
 - 最终返回所有产物绝对路径、功能数、稿件字数/预估时长（400–430 字/分钟）、证据条数、截图清单、待核验项和各阶段耗时。

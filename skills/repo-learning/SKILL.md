@@ -21,7 +21,7 @@ description: 仓库学习报告（流水线第 1 步）。对任意代码仓库�
 
 1. 固定源码身份，写 `stages/00-context.md` 与 `stages/00-run-manifest.md`；
 2. 建立/刷新/验证 CodeGraph（仓库无 `.codegraph/codegraph.db` 时自行查明本机 codegraph 入口并建索引），写 `stages/00-codegraph.md`；
-3. **只做一次产品读取**（README/docs、路由/命令、持久对象、Worker、依赖清单、外部边界），写 `stages/01-project.md` 与 `stages/02-product-surfaces.md`；md 文档是一手产品声明证据源，与代码不符处以代码为准并显式标注；
+3. **只做一次产品读取**（README/docs、路由/命令、持久对象、Worker、依赖清单、外部边界、**工程封装边界**：workspace 成员/子包及其作者自述），写 `stages/01-project.md` 与 `stages/02-product-surfaces.md`；md 文档是一手产品声明证据源，与代码不符处以代码为准并显式标注；
 4. surface 账本归并核心功能，写 `stages/02-capabilities.md`（每个 surface_id 恰好处置一次，禁止"取前 N 个"式静默截断）；
 5. 每个核心功能闭合逐跳因果证据（`文件:行号`），写 `stages/03-implementation/{功能}.evidence.md`；功能并发不超过 3、禁止递归分派；
 6. 工程地图 `stages/04-engineering.md`。

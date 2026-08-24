@@ -13,7 +13,7 @@ description: 视频教程稿件（流水线第 2 步，人机协作：用户主�
 
 - `LEARNING`：repo-learning 产出的 `learning.md` 绝对路径（推荐）或其 `OUTPUT` 根目录（从中取 `stages/` 证据基座与 `screenshots/` 素材）；**禁止重新扫描源码仓库**；
 - `DRAFT`：用户初版文稿路径（全自动档缺省）；
-- `OUTPUT`：输出目录（缺省时取 LEARNING 同级 `{repository-name}-script/`），其下为 `manuscript.md`、`index.html`、`publish.md`、`stages/`、`screenshots/`；
+- `OUTPUT`：输出目录；**单仓单夹合同（2026-08-24 固化）：输出必须落在该仓库的 `{repository-name}-teaching/` 根目录内**，本 skill 的产物在其 `script/` 子目录（缺省取 LEARNING 所在 teaching 根的 `script/`），其下为 `manuscript.md`、`index.html`、`publish.md`、`stages/`、`screenshots/`；发现散落布局（如 `{repo}-script/`、`{repo}-tutorial-script/`）时先迁移归位再开工；
 - `STYLE`：`tutorial`（默认）/ `teardown` / `interview`，见 [style-recipes.md](references/style-recipes.md)；
 - `LENGTH`：`short` / `standard`（默认）/ `long`；
 - `EPISODE`：`single`（默认）或 `series`；系列时产出大纲并至少完成第 1 集正稿；

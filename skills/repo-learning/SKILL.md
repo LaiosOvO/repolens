@@ -12,7 +12,7 @@ description: 仓库学习报告（流水线第 1 步）。对任意代码仓库�
 ## 输入
 
 - `SOURCE`：源码仓库绝对路径（必填）；
-- `OUTPUT`：输出根目录绝对路径（缺省时在 `SOURCE` 父目录创建 `{repository-name}-learning/`），其下为 `learning.md`、`stages/`、`screenshots/`；不要写入上游源码仓库；
+- `OUTPUT`：输出根目录绝对路径；**单仓单夹合同（2026-08-24 固化）：一个仓库的全部产物收进一个根目录 `{repository-name}-teaching/`**，本 skill 的产物在其 `learning/` 子目录（缺省 `{SOURCE 父目录}/{repository-name}-teaching/learning/`），其下为 `learning.md`、`directory-guide.md`、`stages/`、`screenshots/`；发现既有散落布局（如 `{repo}-learning/`、`{repo}-system-explainer/`）时先迁移归位再开工；不要写入上游源码仓库；
 - `LANGUAGE`：默认简体中文。
 
 ## 阶段零：上游热更新（每次生成都先做，产出变更报告给用户）

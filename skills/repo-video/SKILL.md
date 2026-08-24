@@ -12,8 +12,8 @@ description: 视频稿渲染成片（流水线第 3 步）。输入 repo-script 
 ## 输入
 
 - `MANUSCRIPT`：repo-script 产出的 `manuscript.md` 绝对路径（必填；系列稿逐集处理）；
-- `ASSETS`：素材目录（缺省时取 manuscript 同级的 `../learning/screenshots/` 与 repo-script 的素材清单）；缺素材的场景显式标「待补拍」，不得用无关图片凑数；
-- `OUTPUT`：输出目录（缺省时取 manuscript 同级 `video/`），其下为 `storyboard.md`、渲染工程、`audio/`、`subtitles/`、`out/`；
+- `ASSETS`：素材目录（缺省时取该 teaching 根的 `learning/screenshots/` 与 `script/screenshots/`）；缺素材的场景显式标「待补拍」，不得用无关图片凑数；
+- `OUTPUT`：输出目录；**单仓单夹合同（2026-08-24 固化）：输出必须落在该仓库的 `{repository-name}-teaching/` 根目录内**，本 skill 的产物在其 `video/` 子目录（缺省取 MANUSCRIPT 所在 teaching 根的 `video/`），其下为 `storyboard.md`、渲染工程、`audio/`、`subtitles/`、`out/`；
 - `ROUTE`：`remotion`（默认，路线 A）/ `hyperframes`（路线 B）；
 - `TTS`：本机可用 TTS 入口自行查明；语速按 550 字/分钟（约 1.35x 口播）估算；
 - `FORMAT`：`1080x1920` 竖屏（默认，抖音）/ `1920x1080` 横屏；fps 默认 30。

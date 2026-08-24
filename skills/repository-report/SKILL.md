@@ -15,7 +15,7 @@ description: 纯 Skill 仓库讲解流水线。由当前 Codex、Claude Code 或
 - `OUTPUT`：输出目录绝对路径；
 - `STAGE`：默认 `all`，也可停在 `context`、`project`、`capabilities`、`implementation`、`engineering` 或 `render`。
 
-缺少 `OUTPUT` 时，在 `SOURCE` 的父目录创建 `{repository-name}-system-explainer/`。不要写入上游源码仓库。
+**单仓单夹合同（2026-08-24 固化）**：一个仓库的全部产物收进一个根目录 `{repository-name}-teaching/`，本 skill 的产物在其 `report/` 子目录。缺少 `OUTPUT` 时，在 `SOURCE` 的父目录创建 `{repository-name}-teaching/report/`。发现既有散落布局（如 `{repo}-system-explainer/`）时先迁移归位再开工。不要写入上游源码仓库。
 
 ## 固定顺序
 

@@ -9,6 +9,7 @@
 - 总控进度手册（任何 agent 续写的入口）：`/Volumes/T7/kb/repo/产出进度.md`
 - 源头风格材料：`/Volumes/T7/kb/代码教程整理/`（全栈观察员/Leo与Frank/小哲 129 题）、`/Volumes/T7/kb/douyin_全栈观察员/转录合集.md`
 - 六仓产出：Proma、eigent（桌面agent应用/）；loopx、prime-agent、codex（agent-cli与运行时/）；cumora（agent协作平台/），各在 `{仓库名}-teaching/`
+- **单仓单夹合同**（2026-08-24 固化，commit 6b536c1）：一个仓库全部产物收进 `{repo}-teaching/` 单根目录——report/（repository-report）、learning/（repo-learning）、script/（repo-script）、video/（repo-video）、_legacy/（旧布局归档）；发现散落布局先迁移归位再开工。旧布局（*-system-explainer/、*-learning/、*-script/）已于当日全部清理归位，备份在 `/Volumes/T7/kb/repo_备份_2026-08-24_单仓单夹迁移/`
 - codegraph CLI：`/Users/admin/.local/bin/codegraph`，各仓 `.codegraph/` 已建索引
 - 报告侧深度合同：`repolens/skills/repository-report/references/`
 
